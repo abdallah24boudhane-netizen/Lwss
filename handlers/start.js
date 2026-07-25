@@ -183,7 +183,7 @@ async function showMainMenu(ctx, name) {
   // ── لوحة الإدارة ──
   if (ctx.isOwner) rows.push([btn('🔧 لوحة الإدارة', 'mg_menu')]);
   else if (ctx.isAdmin) rows.push([btn('🛡️ لوحة الإدارة', 'mg_menu')]);
-  if (ctx.isOwner || ctx.isAdmin) rows.push([btn('👥 قروباتي', 'gp_mylist')]);
+  rows.push([btn('👥 قروباتي', 'gp_mylist')]);
 
   return eos(ctx, welcome, { parse_mode: 'Markdown', ...build(rows) });
 }
