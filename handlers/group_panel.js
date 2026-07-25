@@ -253,6 +253,10 @@ async function handleCallback(ctx, data) {
     return ctx.reply('📢 *ارسال رسالة للقروبات*\n\nارسل الرسالة:\n نص فقط\n صورة مع caption\n فيديو مع caption\n\n_(او /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
   }
 
+  if (data === 'gp_mylist') {
+    return showMyGroups(ctx);
+  }
+
   if (data.startsWith('gp_poll_')) {
     const chatId = data.replace('gp_poll_', '');
     await require('../handlers/poll_system').startCreate(ctx, chatId);
