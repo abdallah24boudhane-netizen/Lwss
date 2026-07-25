@@ -50,6 +50,7 @@ async function startHandler(ctx) {
     const BOT_UN = process.env.BOT_USERNAME || '';
     const rows = [
       [btn('📚 تصفح المحتوى', 'browse')],
+      [btn('👥 قروباتي', 'gp_mylist')],
       [{ text: '➕ أضف البوت لمجموعتك', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }]
     ];
     const replyOpts = {
