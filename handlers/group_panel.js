@@ -194,27 +194,59 @@ async function showGroupDetail(ctx, chatId) {
   }
 
   const rows = [
-    // ── الترحيب ──
+    [kbBtn('👋 الترحيب والوداع', 'gp_sec_welcome_' + chatId),
+     kbBtn('🛡 الحماية',        'gpx_home_' + chatId)],
+    [kbBtn('📢 الإشعارات',      'gp_sec_notify_' + chatId),
+     kbBtn('🎓 معلومات القروب', 'gp_sec_info_' + chatId)],
+    [kbBtn('📊 الإحصائيات',     'grp_stats_' + chatId),
+     kbBtn('👥 الأعضاء',        'grp_main_' + chatId)],
+  ];
+  if (ctx.isOwner) {
+    rows.push([kbBtn('🗳 التصويت', 'gp_sec_poll_' + chatId)]);
+  }
+  rows.push([kbBtn('📢 راسل هذا القروب', 'gp_msgone_' + chatId)]);
+  rows.push([kbBtn('◀️ رجوع', 'gp_panel'), kbBtn('🗑 إغلاق', 'gp_close')]);
+  rows.push([kbBtn('🚪 خروج من القروب', 'gp_leave_' + chatId)]);
+  return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
+}
+
+// ── قوائم فرعية جديدة ──
+async function showGroupWelcomeSection(ctx, chatId) {
+  const rows = [
     [kbBtn('📜 تعديل القواعد', 'gp_setrules_' + chatId),
-     kbBtn('✏️ رسالة الترحيب', 'gp_setwelcome_' + chatId),
-     kbBtn('🖼 صورة الترحيب',  'gp_setwphoto_'  + chatId)],
-    // ── تبديل الإعدادات ──
-    [kbBtn(g.welcome_enabled  ? '🔴 إيقاف الترحيب'  : '🟢 تفعيل الترحيب',  'gp_togglew_'      + chatId),
-     kbBtn(g.goodbye_enabled  ? '🔴 إيقاف الوداع'   : '🟢 تفعيل الوداع',   'gp_togglebye_'    + chatId)],
-    [kbBtn(g.notify_new_files ? '🔕 إيقاف الإشعار'  : '🔔 تفعيل الإشعار',  'gp_togglenotify_' + chatId),
-     kbBtn('🎓 تغيير التخصص',                                                'gp_setspec_'      + chatId)],
-    // ── الحماية الاحترافية ──
-    [kbBtn('🛡 لوحة الحماية الاحترافية', 'gpx_home_' + chatId)],
-    // ── إجراءات ──
-    [kbBtn('📢 راسل هذا القروب', 'gp_msgone_'  + chatId),
-     kbBtn('📊 إحصائيات',        'grp_stats_'  + chatId)],
+     kbBtn('✏️ رسالة الترحيب', 'gp_setwelcome_' + chatId)],
+    [kbBtn('🖼 صورة الترحيب', 'gp_setwphoto_' + chatId)],
+    [kbBtn('◀️ رجوع', 'gp_view_' + chatId)],
+  ];
+  return eos(ctx, '👋 *الترحيب والوداع*\n━━━━━━━━━━━━━━━━━━', { parse_mode: 'Markdown', ...kbBuild(rows) });
+}
+
+async function showGroupNotifySection(ctx, chatId, g) {
+  const rows = [
+    [kbBtn(g.welcome_enabled  ? '🔴 إيقاف الترحيب'  : '🟢 تفعيل الترحيب',  'gp_togglew_'      + chatId)],
+    [kbBtn(g.goodbye_enabled  ? '🔴 إيقاف الوداع'   : '🟢 تفعيل الوداع',   'gp_togglebye_'    + chatId)],
+    [kbBtn(g.notify_new_files ? '🔕 إيقاف الإشعار'  : '🔔 تفعيل الإشعار',  'gp_togglenotify_' + chatId)],
+    [kbBtn('◀️ رجوع', 'gp_view_' + chatId)],
+  ];
+  return eos(ctx, '📢 *الإشعارات*\n━━━━━━━━━━━━━━━━━━', { parse_mode: 'Markdown', ...kbBuild(rows) });
+}
+
+async function showGroupInfoSection(ctx, chatId) {
+  const rows = [
+    [kbBtn('🎓 تغيير التخصص', 'gp_setspec_' + chatId)],
+    [kbBtn('◀️ رجوع', 'gp_view_' + chatId)],
+  ];
+  return eos(ctx, '🎓 *معلومات القروب*\n━━━━━━━━━━━━━━━━━━', { parse_mode: 'Markdown', ...kbBuild(rows) });
+}
+
+async function showGroupPollSection(ctx, chatId) {
+  if (!ctx.isOwner) return ctx.answerCbQuery('🚫 هذا القسم للمالك فقط').catch(() => {});
+  const rows = [
     [kbBtn('📋 إنشاء تصويت', 'gp_poll_' + chatId)],
     [kbBtn('⏹ إيقاف التصويت', 'gp_pollstop_' + chatId), kbBtn('👁 عرض النتائج', 'gp_pollresults_' + chatId)],
-    [kbBtn('👥 الأعضاء', 'grp_main_' + chatId)],
-    [kbBtn('◀️ رجوع', 'gp_panel'), kbBtn('🗑 إغلاق', 'gp_close')],
-    [kbBtn('🚪 خروج من القروب', 'gp_leave_' + chatId)],
+    [kbBtn('◀️ رجوع', 'gp_view_' + chatId)],
   ];
-  return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
+  return eos(ctx, '🗳 *التصويت*\n━━━━━━━━━━━━━━━━━━', { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
 
 async function showBroadcastSpecPicker(ctx) {
@@ -233,6 +265,16 @@ async function handleCallback(ctx, data) {
 
   if (data === 'gp_leaderboard')         return showGroupsLeaderboard(ctx);
   if (data === 'gp_leaderboard_refresh') return showGroupsLeaderboard(ctx, { refresh: true });
+
+  // ── أقسام لوحة القروب المُنظَّمة ──
+  if (data.startsWith('gp_sec_welcome_')) return showGroupWelcomeSection(ctx, data.replace('gp_sec_welcome_', ''));
+  if (data.startsWith('gp_sec_notify_')) {
+    const chatId = data.replace('gp_sec_notify_', '');
+    const g = await get('SELECT * FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => ({}));
+    return showGroupNotifySection(ctx, chatId, g || {});
+  }
+  if (data.startsWith('gp_sec_info_')) return showGroupInfoSection(ctx, data.replace('gp_sec_info_', ''));
+  if (data.startsWith('gp_sec_poll_')) return showGroupPollSection(ctx, data.replace('gp_sec_poll_', ''));
 
   // ── تعديل قواعد القروب ──
   if (data.startsWith('gp_setrules_')) {
@@ -622,4 +664,5 @@ async function cleanDeadGroups(ctx) {
 module.exports = {
   showMyGroups, showMainMenu, showGroupPanel, showGroupsLeaderboard, cleanDeadGroups,
   handleCallback, handleText, handleMedia, migrateGroupPanel,
-  handleInviteMeList, handleGenInvite };
+  handleInviteMeList, handleGenInvite,
+  showGroupWelcomeSection, showGroupNotifySection, showGroupInfoSection, showGroupPollSection };
