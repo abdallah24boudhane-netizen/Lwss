@@ -629,12 +629,22 @@ async function handleGenInvite(ctx, chatId) {
   if (uid !== parseInt(process.env.OWNER_ID)) return ctx.answerCbQuery('🚫').catch(() => {});
 
   try {
-    const link = await ctx.telegram.exportChatInviteLink(chatId);
+    // ✅ getChat يُرجع الرابط الحالي الفعلي للقروب (invite_link) دون
+    // إنشاء رابط جديد أو إبطال القديم — يبقى صالحاً ودائماً ويتحدّث
+    // تلقائياً في كل استعلام حتى لو غيّره المشرفون يدوياً من تيليجرام.
+    const chat = await ctx.telegram.getChat(chatId);
+    let link = chat.invite_link;
+
+    // إذا لم يوجد رابط دائم بعد (نادر)، أنشئ واحداً كـ fallback فقط أول مرة
+    if (!link) {
+      link = await ctx.telegram.exportChatInviteLink(chatId);
+    }
+
     const g = await all('SELECT title FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => []);
-    const title = g[0]?.title || chatId;
-    ctx.answerCbQuery('✅ تم توليد الرابط').catch(() => {});
+    const title = g[0]?.title || chat.title || chatId;
+    ctx.answerCbQuery('✅ تم جلب الرابط الحالي').catch(() => {});
     return ctx.reply(
-      '🔗 *رابط دعوة لـ: ' + title + '*\n\n' + link + '\n\n_الرابط صالح للاستخدام مرة واحدة_',
+      '🔗 *رابط دعوة لـ: ' + title + '*\n\n' + link + '\n\n_هذا هو رابط القروب الحالي — يعمل مهما تغيّرت الظروف طالما لم يُبطَل يدوياً_',
       { parse_mode: 'Markdown' }
     ).catch(() => {});
   } catch(e) {
