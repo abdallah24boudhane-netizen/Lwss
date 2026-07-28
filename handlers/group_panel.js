@@ -279,6 +279,18 @@ async function handleCallback(ctx, data) {
   // ── تعديل قواعد القروب ──
   if (data.startsWith('gp_setrules_')) {
     const chatId = data.replace('gp_setrules_', '');
+    // ✅ لازم يكون OWNER أو أدمن حقيقي في هذا القروب بالذات
+    const isOwnerR = uid === parseInt(process.env.OWNER_ID);
+    if (!isOwnerR) {
+      try {
+        const member = await ctx.telegram.getChatMember(chatId, uid);
+        if (!['administrator','creator'].includes(member?.status)) {
+          return ctx.answerCbQuery('🚫 ليس لديك صلاحية إدارة هذا القروب', { show_alert: true }).catch(() => {});
+        }
+      } catch(e) {
+        return ctx.answerCbQuery('🚫 تعذر التحقق من صلاحياتك', { show_alert: true }).catch(() => {});
+      }
+    }
     await require('../utils/stateManager').setState(ctx.from.id, { type: 'gp_set_rules', chatId });
     return ctx.reply(
       '📜 *تعديل قواعد القروب*\n\nأرسل القواعد الجديدة:\n_(أو /cancel للإلغاء)_\n\n' +
@@ -354,12 +366,20 @@ async function handleCallback(ctx, data) {
   }
 
   if (data.startsWith('gp_setwelcome_')) {
+    // ✅ OWNER فقط يقدر يبدّل رسالة الترحيب — حتى أدمنية القروبات ممنوعين
+    if (uid !== parseInt(process.env.OWNER_ID)) {
+      return ctx.answerCbQuery('🚫 هذا الإجراء للمالك فقط', { show_alert: true }).catch(() => {});
+    }
     const chatId = data.replace('gp_setwelcome_', '');
     await require('../utils/stateManager').setState(uid, { type: 'gp_set_welcome', chatId });
     return ctx.reply('✏️ ارسل نص رسالة الترحيب:\n\nالمتغيرات: {name} اسم العضو | {id} معرفه | {date} التاريخ\n\n_(او /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
   }
 
   if (data.startsWith('gp_setwphoto_')) {
+    // ✅ OWNER فقط يقدر يبدّل صورة الترحيب — حتى أدمنية القروبات ممنوعين
+    if (uid !== parseInt(process.env.OWNER_ID)) {
+      return ctx.answerCbQuery('🚫 هذا الإجراء للمالك فقط', { show_alert: true }).catch(() => {});
+    }
     const chatId = data.replace('gp_setwphoto_', '');
     await require('../utils/stateManager').setState(uid, { type: 'gp_set_wphoto', chatId });
     return ctx.reply('🖼 ارسل صورة الترحيب:\n_(او /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
