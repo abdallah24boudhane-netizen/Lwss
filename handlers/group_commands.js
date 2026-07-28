@@ -1008,6 +1008,12 @@ async function handleSettingsCallback(ctx, data) {
   for (const [prefix, col] of Object.entries(toggleMap)) {
     if (data.startsWith(prefix)) {
       const chatId = data.replace(prefix, '');
+      if (String(chatId) !== String(ctx.chat?.id)) {
+        return ctx.answerCbQuery('🚫 غير مسموح', { show_alert: true }).catch(() => {});
+      }
+      if (!await isTgAdmin(ctx)) {
+        return ctx.answerCbQuery('🚫 للأدمن فقط', { show_alert: true }).catch(() => {});
+      }
       const current = await get('SELECT ' + col + ' FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null);
       const newVal = current?.[col] ? 0 : 1;
       await run('UPDATE group_chats SET ' + col + '=$1 WHERE chat_id=$2', [newVal, chatId]).catch(() => {});
@@ -1018,6 +1024,12 @@ async function handleSettingsCallback(ctx, data) {
 
   if (data.startsWith('gs_setrules_')) {
     const chatId = data.replace('gs_setrules_', '');
+    if (String(chatId) !== String(ctx.chat?.id)) {
+      return ctx.answerCbQuery('🚫 غير مسموح', { show_alert: true }).catch(() => {});
+    }
+    if (!await isTgAdmin(ctx)) {
+      return ctx.answerCbQuery('🚫 للأدمن فقط', { show_alert: true }).catch(() => {});
+    }
     await require('../utils/stateManager').setState(ctx.from.id, { type: 'grp_set_rules', chatId });
     return ctx.reply('📜 أرسل قواعد القروب:').catch(() => {});
   }

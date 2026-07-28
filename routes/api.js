@@ -415,20 +415,15 @@ const upload = multer({
 });
 
 router.post('/admin/upload-media', (req, res, next) => {
-  // Auth manual (لأن multer يتعارض مع json middleware)
+  // ✅ تحقق HMAC حقيقي بدل قراءة uid بدون تحقق
   const initData = req.headers['x-init-data'] || '';
-  if (!initData) return res.status(401).json({ error: 'unauthorized' });
+  const user = require('../utils/webapp_auth').verifyWebApp(initData);
+  if (!user) return res.status(401).json({ error: 'unauthorized' });
+  req.tgUser = user;
   next();
 }, upload.single('file'), async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-
-  // استخرج uid من header
-  let uid = 0;
-  try {
-    const params = new URLSearchParams(req.headers['x-init-data']);
-    const userStr = params.get('user');
-    if (userStr) uid = parseInt(JSON.parse(decodeURIComponent(userStr)).id);
-  } catch(_) {}
+  const uid = parseInt(req.tgUser.id);
 
   const adm = await get('SELECT 1 FROM admins WHERE user_id=$1', [uid]).catch(() => null);
   if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
