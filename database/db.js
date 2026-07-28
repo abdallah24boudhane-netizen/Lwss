@@ -235,6 +235,12 @@ async function initSchema() {
       "CREATE INDEX IF NOT EXISTS idx_channels_sort    ON channels(sort_order ASC,id DESC)",
       "CREATE INDEX IF NOT EXISTS idx_downloads_user   ON downloads(user_id,created_at DESC)",
       "CREATE INDEX IF NOT EXISTS idx_downloads_file   ON downloads(file_id)",               // bundle files
+
+      // ✅ فهارس أداء إضافية — بروفايل المستخدم + نظام البنك
+      "CREATE INDEX IF NOT EXISTS idx_comments_user    ON comments(user_id)",                // profile stats
+      "CREATE INDEX IF NOT EXISTS idx_pro_bank_loans_user ON pro_bank_loans(user_id)",        // bank_pro loans
+      "CREATE INDEX IF NOT EXISTS idx_pro_bank_inv_user   ON pro_bank_investments(user_id)",  // bank_pro investments
+      "CREATE INDEX IF NOT EXISTS idx_bank_loans_user     ON bank_loans(user_id)",            // legacy bank
     ];
     for (const idx of IDX) {
       try { await pg.query(idx); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
