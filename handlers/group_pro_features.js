@@ -470,6 +470,8 @@ function buildBackKb() {
   return { inline_keyboard: [[{ text: '◀️ رجوع', callback_data: 'help_home' }]] };
 }
 async function showHelpHome(ctx) {
+  // ✅ فالخاص: قائمة خاصة بالمستخدم العادي (بحث/ألعاب/بنك/AI)
+  if (ctx.chat?.type === 'private') return showPrivateHelpHome(ctx);
   const isCallback = !!ctx.callbackQuery;
   const txt = '🤖 *مركز المساعدة*\n━━━━━━━━━━━━━━━━\nاختر القسم:';
   if (isCallback) {
@@ -487,12 +489,69 @@ async function showHelpSection(ctx, key) {
   await ctx.answerCbQuery().catch(() => {});
 }
 function handleHelpCallback(ctx, data) {
+  if (data.startsWith('phelp_')) return handlePrivateHelpCallback(ctx, data);
   if (data === 'help_home') return showHelpHome(ctx);
   const key = data.replace('help_', '');
   if (HELP_SECTIONS[key]) return showHelpSection(ctx, key);
   return false;
 }
 const CMDS_TEXT = Object.values(HELP_SECTIONS).map(s => s.text).join('\n\n');
+
+// ══════════════════════════════════════════════════════════
+// 🆘 لوحة المساعدة — نسخة المحادثة الخاصة
+// ══════════════════════════════════════════════════════════
+const PRIVATE_HELP_SECTIONS = {
+  content: {
+    label: '📚 المحتوى',
+    text: '📚 *تصفح المحتوى*\n━━━━━━━━━━━━━━━━\n`/start` — القائمة الرئيسية\n`بحث [اسم]` — بحث سريع\n`جديد` — آخر الملفات المضافة\n`مفضلاتي` — ملفاتك المحفوظة\n`سجلي` — الملفات اللي حملتها\n`ملفي` — بروفايلك',
+  },
+  games: {
+    label: '🎮 الألعاب',
+    text: '🎮 *الألعاب*\n━━━━━━━━━━━━━━━━\n`مليون` — من سيربح المليون\n`خمن` — لعبة التخمين\n`انا` — الانضمام للعبة جارية\n`صح` أو `/truth` — سؤال صراحة\n`جرأة` أو `/dare` — تحدي جرأة\n`زوج` أو `/couple` — زوج اليوم\n`سلوت` أو `/slot` — ماكينة القمار\n`/gamestatus` — حالة الألعاب الجارية',
+  },
+  bank: {
+    label: '💰 البنك',
+    text: '💰 *النظام البنكي*\n━━━━━━━━━━━━━━━━\n`انشاء حساب` — فتح حساب بنكي\n`فلوسي` — رصيدك الحالي\n`فارسي [مبلغ]` (رد) — تحويل لشخص\n`rip [مبلغ]` (رد) — إقراض شخص\n`يومي` أو `/daily` — مكافأة يومية\n`عملة` أو `/flip` — قلب عملة\n`سرقة` أو `/rob` (رد) — سرقة\n`متصدرين` أو `/leaderboard` — الأثرياء\n`متجر` أو `/market` — متجر البوت',
+  },
+  ai: {
+    label: '🤖 الذكاء الاصطناعي',
+    text: '🤖 *مساعد AI*\n━━━━━━━━━━━━━━━━\nتحدث مباشرة مع البوت فالخاص\n`/summarize` أو `لخص` (رد على ملف) — تلخيص',
+  },
+};
+
+function buildPrivateHelpHomeKb() {
+  return { inline_keyboard: [
+    [{ text: PRIVATE_HELP_SECTIONS.content.label, callback_data: 'phelp_content' },
+     { text: PRIVATE_HELP_SECTIONS.games.label,   callback_data: 'phelp_games'   }],
+    [{ text: PRIVATE_HELP_SECTIONS.bank.label,    callback_data: 'phelp_bank'    },
+     { text: PRIVATE_HELP_SECTIONS.ai.label,      callback_data: 'phelp_ai'      }],
+  ]};
+}
+function buildPrivateBackKb() {
+  return { inline_keyboard: [[{ text: '◀️ رجوع', callback_data: 'phelp_home' }]] };
+}
+async function showPrivateHelpHome(ctx) {
+  const isCallback = !!ctx.callbackQuery;
+  const txt = '🤖 *مركز المساعدة*\n━━━━━━━━━━━━━━━━\nاختر القسم:\n\n💡 _إذا رغبت بأوامر إدارة قروب معين، اكتب اوامر داخل ذاك القروب مباشرة._';
+  if (isCallback) {
+    await ctx.editMessageText(txt, { parse_mode: 'Markdown', reply_markup: buildPrivateHelpHomeKb() }).catch(() => {});
+    await ctx.answerCbQuery().catch(() => {});
+  } else {
+    await ctx.reply(txt, { parse_mode: 'Markdown', reply_markup: buildPrivateHelpHomeKb() }).catch(() => {});
+  }
+}
+async function showPrivateHelpSection(ctx, key) {
+  const sec = PRIVATE_HELP_SECTIONS[key];
+  if (!sec) return;
+  await ctx.editMessageText(sec.text, { parse_mode: 'Markdown', reply_markup: buildPrivateBackKb() }).catch(() => {});
+  await ctx.answerCbQuery().catch(() => {});
+}
+function handlePrivateHelpCallback(ctx, data) {
+  if (data === 'phelp_home') return showPrivateHelpHome(ctx);
+  const key = data.replace('phelp_', '');
+  if (PRIVATE_HELP_SECTIONS[key]) return showPrivateHelpSection(ctx, key);
+  return false;
+}
 
 // ══════════════════════════════════════════════════════════
 // 🔁 تسجيل الأوامر
@@ -539,6 +598,7 @@ function setupProFeatures(bot) {
   // 🆘 help — لوحة تفاعلية بالأزرار
   bot.command(['help', 'مساعدة', 'cmds', 'commands', 'اوامر', 'أوامر'], showHelpHome);
   bot.hears(/^(مساعدة|اوامر|الاوامر)$/, showHelpHome);
+  bot.action(/^phelp_/, ctx => handlePrivateHelpCallback(ctx, ctx.callbackQuery.data));
 }
 
 module.exports = {

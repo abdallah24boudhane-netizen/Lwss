@@ -239,6 +239,8 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'grp_main_',   fn: (ctx, d) => { const chatId = d.replace('grp_main_',''); const { showAllMembers } = require('../handlers/group_admin'); return showAllMembers(ctx, chatId); } },
     { p: 'grp_main',    fn: (ctx, d) => { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? groupPanel.showMainMenu(ctx) : groupPanel.showMyGroups(ctx); } },
     { p: 'gp_',         fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
+    { p: 'help_',       fn: (ctx, d) => require('../handlers/group_pro_features').handleHelpCallback(ctx, d) },
+    { p: 'phelp_',      fn: (ctx, d) => require('../handlers/group_pro_features').handleHelpCallback(ctx, d) },
     { p: 'gpq_',        fn: async (ctx, d) => {
       const parts = d.replace('gpq_', '').split('_');
       const action = parts[0];

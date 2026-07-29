@@ -285,36 +285,6 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
     else ctx.reply(txt, {parse_mode:'Markdown'}).catch(()=>{});
   });
 
-  // ── /help ──
-
-  const { handleHelp } = require('../handlers/help');
-  bot.command(['help', 'مساعدة', 'اوامر', 'cmds'], async ctx => {
-    if (['group','supergroup'].includes(ctx.chat?.type)) {
-      const un = ctx.botInfo?.username || '';
-      ctx.deleteMessage().catch(()=>{});
-      const m = await ctx.reply(
-        '📋 *الأوامر المتاحة في القروب:*\n\n' +
-        '`/all` — منشن جميع الأعضاء\n' +
-        '`/warn` — تحذير عضو (رد عليه)\n' +
-        '`/mute` — كتم عضو\n' +
-        '`/ban` — حظر عضو\n' +
-        '`/del` — حذف رسالة (رد عليها)\n' +
-        '`/del50` `/del100` `/del200` — حذف رسائل\n' +
-        '`/purge` — حذف من رسالة لآخر\n' +
-        '`/stats` — إحصائيات القروب\n' +
-        '`/rules` — قواعد القروب\n\n' +
-        '👇 لمزيد من الأوامر:',
-        {
-          parse_mode: 'Markdown',
-          reply_markup: { inline_keyboard: [[
-            { text: '📖 كل الأوامر', url: 'https://t.me/' + un }
-          ]]}
-        }
-      ).catch(()=>null);
-      if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(()=>{}), 30000);
-      return;
-    }
-    return handleHelp(ctx);
-  });
+  // ── /help و اوامر انتقلوا لـ handlers/group_pro_features.js (مصدر واحد موحّد) ──
 
 };

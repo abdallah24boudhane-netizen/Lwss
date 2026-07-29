@@ -504,18 +504,7 @@ function setupGroupCommands(bot) {
     await sendInfoPanel(ctx, target, ctx.chat.id, ctx.from.id);
   });
 
-  // ══ /cmds ══
-  bot.command(["cmds", "اوامر"], async ctx => {
-    if (!isGroup(ctx)) return;
-    delCmd(ctx);
-    const isAdm = await isTgAdmin(ctx);
-    let txt = "📋 *أوامر البوت*\n\n👥 *للجميع:*\n`/info` معلومات عضو\n`/rules` القواعد\n`مليون` لعبة المليون\n`خمن` لعبة التخمين\n";
-    if (isAdm) {
-      txt += "\n🛡️ *للمشرفين:*\n`/ban` `/unban` `/kick`\n`/mute 10m` `/unmute`\n`/warn` `/warns` `/unwarn`\n`/pin` `/unpin`\n`/promote` `/demote`\n`/info` `/clean 20`\n`/mstop` `/mstats`\n`/tagall` `/stats`\n";
-    }
-    const m = await ctx.reply(txt, { parse_mode: "Markdown" }).catch(() => null);
-    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 30000);
-  });
+  // ── /cmds و اوامر انتقلوا لـ handlers/group_pro_features.js (مصدر واحد موحّد) ──
 
 
   // ══════════════════════════════════════════
