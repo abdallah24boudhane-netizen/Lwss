@@ -285,7 +285,11 @@ module.exports.registerMessages = function(bot, deps) {
     }
 
     if (ctx.chat?.type !== 'private') return;
-    if (!ctx.isAdmin && !ctx.isOwner) {
+    // ✅ اسمح بالمرور لو عنده state معلّق من group_panel (gp_...) حتى لو مو أدمن عام على البوت
+    // (التحقق الحقيقي إنه أدمن فذاك القروب بالذات صار مسبقاً فـ group_panel.js عند بداية الخطوة)
+    const _pendingState = require('../utils/stateManager').getState(ctx.uid);
+    const _hasGpState = _pendingState?.type?.startsWith('gp_');
+    if (!ctx.isAdmin && !ctx.isOwner && !_hasGpState) {
       await require('../handlers/forward_organizer').handleForward(ctx).catch(() => {});
       return;
     }
