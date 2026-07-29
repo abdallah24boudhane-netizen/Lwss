@@ -260,7 +260,7 @@ async function handleMemberAction(ctx, action, chatId, targetUserId) {
     } else if (action === 'msg') {
       await require('../utils/stateManager').setState(ctx.uid, { type: 'gm_dm', chatId, targetUserId });
       await ctx.answerCbQuery().catch(() => {});
-      return ctx.reply('✉️ اكتب الرسالة اللي تحب تبعتها لهذا العضو:\n_(أو /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
+      return ctx.reply('✉️ اكتب أو ابعت (نص/ستيكر/صورة/فيديو/فويس) اللي تحب تبعتو لهذا العضو:\n_(أو /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
     }
   } catch (e) {
     logger.error('[gm_act] ' + action + ' failed: ' + e.message);
@@ -270,10 +270,10 @@ async function handleMemberAction(ctx, action, chatId, targetUserId) {
   return showMemberCard(ctx, chatId, targetUserId);
 }
 
-// ── معالجة رسائل الحالة (بحث / مراسلة عضو) ──
+// ── معالجة رسائل الحالة (بحث / مراسلة عضو نصية) ──
 async function handleText(ctx, txt, state) {
   if (state.type === 'gm_dm') {
-    await require('../utils/stateManager').deleteState(ctx.uid);
+    require('../utils/stateManager').delState(ctx.uid);
     if (txt === '/cancel') return ctx.reply('❌ تم الإلغاء.').catch(() => {});
     try {
       await ctx.telegram.sendMessage(state.targetUserId, `📩 رسالة من إدارة القروب:\n\n${txt}`);
@@ -283,7 +283,7 @@ async function handleText(ctx, txt, state) {
     }
   }
   if (state.type === 'gm_search') {
-    await require('../utils/stateManager').deleteState(ctx.uid);
+    require('../utils/stateManager').delState(ctx.uid);
     if (txt === '/cancel') return ctx.reply('❌ تم الإلغاء.').catch(() => {});
     return showMembersList(ctx, state.chatId, 'search', 0, txt.trim().slice(0, 60));
   }

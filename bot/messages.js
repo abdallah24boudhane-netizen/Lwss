@@ -187,6 +187,19 @@ module.exports.registerMessages = function(bot, deps) {
 
   // ── Documents ──
   bot.on('document', async ctx => {
+    {
+      const _gmS = require('../utils/stateManager').getState(ctx.uid);
+      if (_gmS?.type === 'gm_dm') {
+        require('../utils/stateManager').delState(ctx.uid);
+        try {
+          await ctx.telegram.copyMessage(_gmS.targetUserId, ctx.chat.id, ctx.message.message_id);
+          await ctx.reply('✅ تم إرسال الرسالة.').catch(() => {});
+        } catch (e) {
+          await ctx.reply('❌ ما قدرتش نبعت الرسالة (يمكن العضو ما بداش محادثة مع البوت).').catch(() => {});
+        }
+        return;
+      }
+    }
     if (!ctx.isAdmin && !ctx.isOwner) {
       await require('../handlers/forward_organizer').handleForward(ctx).catch(() => {});
       return;
@@ -274,6 +287,19 @@ module.exports.registerMessages = function(bot, deps) {
 
     // ── Photos / Videos / Audio / Voice ──
   bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
+    {
+      const _gmS = require('../utils/stateManager').getState(ctx.uid);
+      if (_gmS?.type === 'gm_dm') {
+        require('../utils/stateManager').delState(ctx.uid);
+        try {
+          await ctx.telegram.copyMessage(_gmS.targetUserId, ctx.chat.id, ctx.message.message_id);
+          await ctx.reply('✅ تم إرسال الرسالة.').catch(() => {});
+        } catch (e) {
+          await ctx.reply('❌ ما قدرتش نبعت الرسالة (يمكن العضو ما بداش محادثة مع البوت).').catch(() => {});
+        }
+        return;
+      }
+    }
     // 💳 معالج صورة البطاقة الشخصية (في القروب أو الخاص)
     const _s = require('../utils/stateManager').getState(ctx.uid);
     if (_s?.type === 'member_card_photo') {
@@ -598,6 +624,19 @@ module.exports.registerMessages = function(bot, deps) {
     } catch(e) {}
   });
   bot.on('sticker', async ctx => {
+    {
+      const _gmS = require('../utils/stateManager').getState(ctx.uid);
+      if (_gmS?.type === 'gm_dm') {
+        require('../utils/stateManager').delState(ctx.uid);
+        try {
+          await ctx.telegram.copyMessage(_gmS.targetUserId, ctx.chat.id, ctx.message.message_id);
+          await ctx.reply('✅ تم إرسال الرسالة.').catch(() => {});
+        } catch (e) {
+          await ctx.reply('❌ ما قدرتش نبعت الرسالة (يمكن العضو ما بداش محادثة مع البوت).').catch(() => {});
+        }
+        return;
+      }
+    }
     if (ctx.chat?.type !== 'private') return;
     const s = require('../utils/stateManager').getState(ctx.uid);
     // إذا كان في وضع إضافة رد تلقائي — احفظ الستيكر
