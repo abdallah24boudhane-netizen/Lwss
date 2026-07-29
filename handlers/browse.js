@@ -278,15 +278,15 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
       backCb = 'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId;
     } else {
       var realPath = await content.getPathFromCategory(catId).catch(function(){ return null; });
-      require('../utils/logger').error('[backCb DEBUG] catId='+catId+' realPath='+JSON.stringify(realPath));
+      require('../utils/logger').debug('[backCb] catId='+catId+' realPath='+JSON.stringify(realPath));
       if (realPath && realPath.spId) {
         backCb = 'ct_'+realPath.spId+'_'+realPath.yrId+'_'+realPath.smId+'_'+realPath.sbId+'_'+catId;
-        require('../utils/logger').error('[backCb DEBUG] built backCb='+backCb);
+        require('../utils/logger').debug('[backCb] built backCb='+backCb);
         // أبطل أي كاش قديم لهذا المسار (قد يكون بُني سابقاً بمعرّفات أصفار خاطئة)
         cacheClear('showfiles_'+catId);
         cacheClear('path_'+realPath.spId+'_'+realPath.yrId+'_'+realPath.smId+'_'+realPath.sbId+'_'+catId);
       } else {
-        require('../utils/logger').error('[backCb DEBUG] realPath invalid, backCb stays main_menu');
+        require('../utils/logger').debug('[backCb] realPath invalid, backCb stays main_menu');
       }
     }
   }
