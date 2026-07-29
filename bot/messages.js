@@ -521,6 +521,7 @@ module.exports.registerMessages = function(bot, deps) {
       }
       if ((s?.type || '').startsWith('mg_') && (ctx.isAdmin || ctx.isOwner)) return manage.handleText(ctx, s);
       if ((s?.type || '').startsWith('gp_')) return groupPanel.handleText(ctx, txt, s);
+      if ((s?.type || '').startsWith('gm_')) return require('../handlers/group_members_panel').handleText(ctx, txt, s);
       if ((s?.type || '').startsWith('gpx_')) {
         const handled = await require('../handlers/group_pro_panel').handleText(ctx, txt, s).catch(() => false);
         if (handled !== false) return;
