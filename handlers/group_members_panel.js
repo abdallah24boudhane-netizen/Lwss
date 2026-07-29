@@ -12,8 +12,17 @@
  * ──────────────────────────────────────────────────────────────
  */
 const { run, get, all } = require('../database/db');
-const { isTgAdmin } = require('./group_commands');
 const logger = require('../utils/logger');
+
+// ✅ يتحقق من صلاحية المستخدم فـ القروب المستهدف بالذات (chatId)،
+//    وليس فـ ctx.chat.id (اللي يكون المحادثة الخاصة عند الدخول من لوحة الإدارة عن بعد)
+async function isTgAdmin(ctx, chatId) {
+  if (ctx.isOwner || ctx.isAdmin) return true;
+  try {
+    const member = await ctx.telegram.getChatMember(chatId, ctx.from.id);
+    return ['administrator', 'creator'].includes(member?.status);
+  } catch { return false; }
+}
 
 const PAGE_SIZE = 8;
 
@@ -49,7 +58,7 @@ function fmtAgo(d) {
 // 🏠 الصفحة الرئيسية للوحة الأعضاء
 // ══════════════════════════════════════════════════════════
 async function showMembersHub(ctx, chatId) {
-  if (!await isTgAdmin(ctx)) {
+  if (!await isTgAdmin(ctx, chatId)) {
     return ctx.answerCbQuery('🚫 هذا القسم للمشرفين فقط', { show_alert: true }).catch(() => {});
   }
   const tgTotal = await ctx.telegram.getChatMembersCount(chatId).catch(() => 0);
@@ -131,7 +140,7 @@ async function fetchPage(chatId, mode, page, ctx, query) {
 }
 
 async function showMembersList(ctx, chatId, mode, page, query) {
-  if (!await isTgAdmin(ctx)) {
+  if (!await isTgAdmin(ctx, chatId)) {
     return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
   }
   const { rows, total } = await fetchPage(chatId, mode, page, ctx, query);
@@ -170,7 +179,7 @@ async function showMembersList(ctx, chatId, mode, page, query) {
 // 🪪 بطاقة عضو كاملة + أزرار إدارة حقيقية
 // ══════════════════════════════════════════════════════════
 async function showMemberCard(ctx, chatId, targetUserId) {
-  if (!await isTgAdmin(ctx)) {
+  if (!await isTgAdmin(ctx, chatId)) {
     return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
   }
   const [row, tgMember] = await Promise.all([
@@ -223,7 +232,7 @@ async function showMemberCard(ctx, chatId, targetUserId) {
 // ⚡ تنفيذ إجراءات الإدارة (تستخدم دوال group_admin الموجودة فعلاً)
 // ══════════════════════════════════════════════════════════
 async function handleMemberAction(ctx, action, chatId, targetUserId) {
-  if (!await isTgAdmin(ctx)) {
+  if (!await isTgAdmin(ctx, chatId)) {
     return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
   }
   const admin = require('./group_admin');
@@ -291,7 +300,7 @@ async function handleText(ctx, txt, state) {
 }
 
 async function requestSearch(ctx, chatId) {
-  if (!await isTgAdmin(ctx)) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
+  if (!await isTgAdmin(ctx, chatId)) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
   await require('../utils/stateManager').setState(ctx.uid, { type: 'gm_search', chatId });
   await ctx.answerCbQuery().catch(() => {});
   return ctx.reply('🔎 اكتب اسم العضو، اليوزر، أو الـ ID اللي تحب تبحث عليه:\n_(أو /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
