@@ -322,6 +322,32 @@ async function initSchema() {
   )`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_auto_replies_active ON auto_replies(is_active)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
+  // ✅ إعادة مزامنة كل الـ sequences (id counters) مع البيانات الحقيقية
+  // يصلح مشكلة "duplicate key value violates unique constraint ..._pkey"
+  // اللي تصير بعد استعادة نسخة احتياطية بـ IDs ثابتة بدون تحديث العدّاد.
+  // آمن يتكرر عند كل تشغيل — بلا أي تأثير جانبي.
+  try {
+    if (pg) {
+      const { rows } = await pg.query(`
+        SELECT c.relname AS seq_name, t.relname AS table_name, a.attname AS col_name
+        FROM pg_class c
+        JOIN pg_depend d ON d.objid = c.oid AND d.deptype = 'a'
+        JOIN pg_class t ON t.oid = d.refobjid
+        JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = d.refobjsubid
+        WHERE c.relkind = 'S'
+      `);
+      for (const r of rows) {
+        try {
+          await pg.query(
+            `SELECT setval($1, COALESCE((SELECT MAX(${r.col_name}) FROM ${r.table_name}), 1))`,
+            [r.seq_name]
+          );
+        } catch (_) {}
+      }
+      require('../utils/logger').info('[DB] ✅ Sequences resynced: ' + rows.length);
+    }
+  } catch (err) { require('../utils/logger').debug('[catch]', err.message); }
+
 
   // ── جداول الميزات الجديدة ──
   try { await pg.query(`CREATE TABLE IF NOT EXISTS afk_users(
