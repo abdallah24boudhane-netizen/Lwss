@@ -145,6 +145,18 @@ async function showGroupsLeaderboard(ctx, opts = {}) {
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
 
+// ✅ تحقق موحّد من صلاحية إدارة قروب مُعيّن (Owner أو أدمن حقيقي في *هذا* القروب بالذات)
+async function checkGroupAdmin(ctx, chatId) {
+  const uid = ctx.uid || ctx.from?.id;
+  if (uid === parseInt(process.env.OWNER_ID)) return true;
+  try {
+    const member = await ctx.telegram.getChatMember(chatId, uid);
+    if (['administrator','creator'].includes(member?.status)) return true;
+  } catch (e) { /* fallthrough */ }
+  await ctx.answerCbQuery('🚫 ليس لديك صلاحية إدارة هذا القروب', { show_alert: true }).catch(() => {});
+  return false;
+}
+
 async function showGroupDetail(ctx, chatId) {
   const uid = ctx.uid || ctx.from?.id;
   const isOwner = uid === parseInt(process.env.OWNER_ID);
@@ -194,20 +206,32 @@ async function showGroupDetail(ctx, chatId) {
   }
 
   const rows = [
-    [kbBtn('👋 الترحيب والوداع', 'gp_sec_welcome_' + chatId),
+    [kbBtn('👥 الأعضاء',        'grp_main_' + chatId),
+     kbBtn('👮 الإدارة',        'gp_roles_' + chatId)],
+    [kbBtn('📋 السجل',          'gp_logs_' + chatId),
+     kbBtn('📊 الإحصائيات',     'grp_stats_' + chatId)],
+    [kbBtn('💬 الرسائل',        'gp_msgone_' + chatId),
      kbBtn('🛡 الحماية',        'gpx_home_' + chatId)],
-    [kbBtn('📢 الإشعارات',      'gp_sec_notify_' + chatId),
+    [kbBtn('⚙️ إعدادات القروب', 'gp_settings_' + chatId)],
+  ];
+  rows.push([kbBtn('◀️ رجوع', 'gp_panel'), kbBtn('🗑 إغلاق', 'gp_close')]);
+  rows.push([kbBtn('🚪 خروج من القروب', 'gp_leave_' + chatId)]);
+  return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
+}
+
+// ── ⚙️ إعدادات القروب — صفحة تجميعية تربط الأقسام الموجودة دون تكرارها ──
+async function showGroupSettingsSection(ctx, chatId) {
+  const rows = [
+    [kbBtn('👋 الترحيب والوداع', 'gp_sec_welcome_' + chatId),
+     kbBtn('📢 الإشعارات',      'gp_sec_notify_' + chatId)],
+    [kbBtn('📜 تعديل القواعد',  'gp_setrules_' + chatId),
      kbBtn('🎓 معلومات القروب', 'gp_sec_info_' + chatId)],
-    [kbBtn('📊 الإحصائيات',     'grp_stats_' + chatId),
-     kbBtn('👥 الأعضاء',        'grp_main_' + chatId)],
   ];
   if (ctx.isOwner) {
     rows.push([kbBtn('🗳 التصويت', 'gp_sec_poll_' + chatId)]);
   }
-  rows.push([kbBtn('📢 راسل هذا القروب', 'gp_msgone_' + chatId)]);
-  rows.push([kbBtn('◀️ رجوع', 'gp_panel'), kbBtn('🗑 إغلاق', 'gp_close')]);
-  rows.push([kbBtn('🚪 خروج من القروب', 'gp_leave_' + chatId)]);
-  return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
+  rows.push([kbBtn('◀️ رجوع', 'gp_view_' + chatId)]);
+  return eos(ctx, '⚙️ *إعدادات القروب*\n━━━━━━━━━━━━━━━━━━', { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
 
 // ── قوائم فرعية جديدة ──
@@ -216,7 +240,7 @@ async function showGroupWelcomeSection(ctx, chatId) {
     [kbBtn('📜 تعديل القواعد', 'gp_setrules_' + chatId),
      kbBtn('✏️ رسالة الترحيب', 'gp_setwelcome_' + chatId)],
     [kbBtn('🖼 صورة الترحيب', 'gp_setwphoto_' + chatId)],
-    [kbBtn('◀️ رجوع', 'gp_view_' + chatId)],
+    [kbBtn('◀️ رجوع', 'gp_settings_' + chatId)],
   ];
   return eos(ctx, '👋 *الترحيب والوداع*\n━━━━━━━━━━━━━━━━━━', { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
@@ -226,7 +250,7 @@ async function showGroupNotifySection(ctx, chatId, g) {
     [kbBtn(g.welcome_enabled  ? '🔴 إيقاف الترحيب'  : '🟢 تفعيل الترحيب',  'gp_togglew_'      + chatId)],
     [kbBtn(g.goodbye_enabled  ? '🔴 إيقاف الوداع'   : '🟢 تفعيل الوداع',   'gp_togglebye_'    + chatId)],
     [kbBtn(g.notify_new_files ? '🔕 إيقاف الإشعار'  : '🔔 تفعيل الإشعار',  'gp_togglenotify_' + chatId)],
-    [kbBtn('◀️ رجوع', 'gp_view_' + chatId)],
+    [kbBtn('◀️ رجوع', 'gp_settings_' + chatId)],
   ];
   return eos(ctx, '📢 *الإشعارات*\n━━━━━━━━━━━━━━━━━━', { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
@@ -234,7 +258,7 @@ async function showGroupNotifySection(ctx, chatId, g) {
 async function showGroupInfoSection(ctx, chatId) {
   const rows = [
     [kbBtn('🎓 تغيير التخصص', 'gp_setspec_' + chatId)],
-    [kbBtn('◀️ رجوع', 'gp_view_' + chatId)],
+    [kbBtn('◀️ رجوع', 'gp_settings_' + chatId)],
   ];
   return eos(ctx, '🎓 *معلومات القروب*\n━━━━━━━━━━━━━━━━━━', { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
@@ -244,7 +268,7 @@ async function showGroupPollSection(ctx, chatId) {
   const rows = [
     [kbBtn('📋 إنشاء تصويت', 'gp_poll_' + chatId)],
     [kbBtn('⏹ إيقاف التصويت', 'gp_pollstop_' + chatId), kbBtn('👁 عرض النتائج', 'gp_pollresults_' + chatId)],
-    [kbBtn('◀️ رجوع', 'gp_view_' + chatId)],
+    [kbBtn('◀️ رجوع', 'gp_settings_' + chatId)],
   ];
   return eos(ctx, '🗳 *التصويت*\n━━━━━━━━━━━━━━━━━━', { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
@@ -341,6 +365,24 @@ async function handleCallback(ctx, data) {
 
   if (data === 'gp_invite_me_list') return handleInviteMeList(ctx);
   if (data.startsWith('gp_gen_invite_')) return handleGenInvite(ctx, data.replace('gp_gen_invite_', ''));
+
+  if (data.startsWith('gp_settings_')) {
+    const chatId = data.replace('gp_settings_', '');
+    if (!(await checkGroupAdmin(ctx, chatId))) return;
+    return showGroupSettingsSection(ctx, chatId);
+  }
+
+  if (data.startsWith('gp_roles_')) {
+    const chatId = data.replace('gp_roles_', '');
+    if (!(await checkGroupAdmin(ctx, chatId))) return;
+    return require('./group_roles').showRolesMenu(ctx, chatId);
+  }
+
+  if (data.startsWith('gp_logs_')) {
+    const chatId = data.replace('gp_logs_', '');
+    if (!(await checkGroupAdmin(ctx, chatId))) return;
+    return require('./group_logs').showLogsMenu(ctx, chatId);
+  }
 
   if (data.startsWith('gp_view_')) return showGroupDetail(ctx, data.replace('gp_view_', ''));
 
