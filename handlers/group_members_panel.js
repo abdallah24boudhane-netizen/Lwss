@@ -273,7 +273,13 @@ async function handleMemberAction(ctx, action, chatId, targetUserId) {
     }
   } catch (e) {
     logger.error('[gm_act] ' + action + ' failed: ' + e.message);
-    return ctx.answerCbQuery('❌ فشل الإجراء: ' + (e.description || e.message), { show_alert: true }).catch(() => {});
+    let hint = e.description || e.message || '';
+    if (/not enough rights|CHAT_ADMIN_REQUIRED/i.test(hint)) {
+      hint = 'البوت ما عندوش صلاحية كافية فهذا القروب (تأكد إنه Admin بصلاحية "تعيين مشرفين")';
+    } else if (/user is an administrator of the chat/i.test(hint)) {
+      hint = 'ما تقدرش تدير هذا الإجراء على مشرف آخر رتبتو أعلى من البوت';
+    }
+    return ctx.answerCbQuery('❌ فشل الإجراء: ' + hint, { show_alert: true }).catch(() => {});
   }
 
   return showMemberCard(ctx, chatId, targetUserId);
