@@ -700,13 +700,18 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       case 'mg_ar_response': {
         const trigger = state.trigger;
         const matchType = state.matchType || 'contains';
+        let _arErr = null;
         // نص عادي فقط — الوسائط تُعالج في handleMedia/sticker handlers
         await dbRun(
           'INSERT INTO auto_replies(trigger,response,match_type,resp_type,file_id,created_by) VALUES($1,$2,$3,$4,$5,$6)',
           [trigger, text, matchType, 'text', null, uid]
-        ).catch(()=>{});
+        ).catch(e => { _arErr = e; });
         cacheClear('auto_replies_all');
         clearState(uid);
+        if (_arErr) {
+          await ctx.reply('❌ *فشل حفظ الرد!*\n\nالخطأ:\n`' + escMd(_arErr.message) + '`', { parse_mode: 'Markdown' }).catch(()=>{});
+          return showAutoReplies(ctx);
+        }
         await ctx.reply(
           '✅ *تم حفظ الرد التلقائي!*\n\n' +
           '🔍 عند: `' + escMd(trigger) + '`\n' +
