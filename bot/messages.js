@@ -645,15 +645,23 @@ module.exports.registerMessages = function(bot, deps) {
       const { run: dbR } = require('../database/db');
       const file_id = ctx.message.sticker?.file_id;
       if (file_id) {
+        let _arErr2 = null;
         await dbR(
           'INSERT INTO auto_replies(trigger,response,match_type,resp_type,file_id,created_by) VALUES($1,$2,$3,$4,$5,$6)',
           [s.trigger, '', s.match_type||'contains', 'sticker', file_id, ctx.uid]
-        ).catch(() =>
-          dbR('INSERT INTO auto_replies(trigger,response,match_type,created_by) VALUES($1,$2,$3,$4)',
-            [s.trigger, file_id, s.match_type||'contains', ctx.uid])
-        );
+        ).catch(async e1 => {
+          try {
+            await dbR('INSERT INTO auto_replies(trigger,response,match_type,created_by) VALUES($1,$2,$3,$4)',
+              [s.trigger, file_id, s.match_type||'contains', ctx.uid]);
+          } catch (e2) { _arErr2 = e2; }
+        });
         require('../utils/cache').cacheClear('auto_replies_all');
         setState(ctx.uid, null);
+        if (_arErr2) {
+          return ctx.reply('❌ فشل حفظ رد الستيكر!\n\nالخطأ:\n' + _arErr2.message, {
+            reply_markup: { inline_keyboard: [[{ text: '◀️ رجوع', callback_data: 'mg_auto_replies' }]] }
+          }).catch(() => {});
+        }
         return ctx.reply('✅ رد تلقائي بستيكر أضيف!', {
           reply_markup: { inline_keyboard: [[{ text: '◀️ رجوع', callback_data: 'mg_auto_replies' }]] }
         }).catch(() => {});
