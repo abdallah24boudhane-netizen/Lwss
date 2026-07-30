@@ -389,23 +389,26 @@ async function handleCallback(ctx, data) {
 
   if (data.startsWith('gp_togglew_')) {
     const chatId = data.replace('gp_togglew_', '');
-    const g = await get('SELECT welcome_enabled FROM group_chats WHERE chat_id=$1', [chatId]);
+    const g = await get('SELECT welcome_enabled, goodbye_enabled, notify_new_files FROM group_chats WHERE chat_id=$1', [chatId]);
     await run('UPDATE group_chats SET welcome_enabled=$1 WHERE chat_id=$2', [g?.welcome_enabled ? 0 : 1, chatId]);
-    return showGroupDetail(ctx, chatId);
+    const g2 = await get('SELECT welcome_enabled, goodbye_enabled, notify_new_files FROM group_chats WHERE chat_id=$1', [chatId]);
+    return showGroupNotifySection(ctx, chatId, g2 || {});
   }
 
   if (data.startsWith('gp_togglebye_')) {
     const chatId = data.replace('gp_togglebye_', '');
-    const g = await get('SELECT goodbye_enabled FROM group_chats WHERE chat_id=$1', [chatId]);
+    const g = await get('SELECT welcome_enabled, goodbye_enabled, notify_new_files FROM group_chats WHERE chat_id=$1', [chatId]);
     await run('UPDATE group_chats SET goodbye_enabled=$1 WHERE chat_id=$2', [g?.goodbye_enabled ? 0 : 1, chatId]);
-    return showGroupDetail(ctx, chatId);
+    const g2 = await get('SELECT welcome_enabled, goodbye_enabled, notify_new_files FROM group_chats WHERE chat_id=$1', [chatId]);
+    return showGroupNotifySection(ctx, chatId, g2 || {});
   }
 
   if (data.startsWith('gp_togglenotify_')) {
     const chatId = data.replace('gp_togglenotify_', '');
-    const g = await get('SELECT notify_new_files FROM group_chats WHERE chat_id=$1', [chatId]);
+    const g = await get('SELECT welcome_enabled, goodbye_enabled, notify_new_files FROM group_chats WHERE chat_id=$1', [chatId]);
     await run('UPDATE group_chats SET notify_new_files=$1 WHERE chat_id=$2', [g?.notify_new_files ? 0 : 1, chatId]);
-    return showGroupDetail(ctx, chatId);
+    const g2 = await get('SELECT welcome_enabled, goodbye_enabled, notify_new_files FROM group_chats WHERE chat_id=$1', [chatId]);
+    return showGroupNotifySection(ctx, chatId, g2 || {});
   }
 
   if (data.startsWith('gp_setwelcome_')) {

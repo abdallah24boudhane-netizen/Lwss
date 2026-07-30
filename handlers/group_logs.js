@@ -118,7 +118,7 @@ async function showLogsMenu(ctx, chatId) {
     return [kbBtn(c.label + ' (' + cnt + ')', 'gpx_logcat_' + c.key + '_0_' + chatId)];
   });
   rows.push([kbBtn('📤 تصدير كل السجلات (txt)', 'gpx_logexport_' + chatId)]);
-  rows.push([kbBtn('◀️ رجوع', 'gpx_home_' + chatId)]);
+  rows.push([kbBtn('◀️ رجوع', 'gp_view_' + chatId)]);
 
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
 }

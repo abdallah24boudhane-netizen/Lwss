@@ -126,7 +126,7 @@ async function showRolesMenu(ctx, chatId) {
     rows.push([kbBtn('🗑 إزالة رتبة', 'gpx_rolerm_' + chatId)]);
   }
   rows.push([kbBtn('📜 شرح الصلاحيات', 'gpx_roleperms_' + chatId)]);
-  rows.push([kbBtn('◀️ رجوع', 'gpx_home_' + chatId)]);
+  rows.push([kbBtn('◀️ رجوع', 'gp_view_' + chatId)]);
 
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
