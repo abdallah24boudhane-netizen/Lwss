@@ -188,7 +188,7 @@ function setupProCommands(bot) {
     const arg = (ctx.message.text || '').split(/\s+/).slice(1).join(' ');
     const type = resolveLockType(arg);
     if (!type) {
-      return tempReply(ctx, '❌ نوع غير معروف.\nالأنواع: sticker, gif, link, forward, photo, video, voice, poll', {}, 10000);
+      return tempReply(ctx, '❌ نوع غير معروف.\nالأنواع المتاحة:\n🖼 صور | 🎬 فيديو | 🎤 صوت | 📊 تصويت | 🎭 ملصقات | 🎞 متحركة | 🔗 روابط | ↪️ توجيه\n\nمثال: قفل فيديو', {}, 12000);
     }
     await db.setLock(ctx.chat.id, type, !unlock);
     protection.clearLocksCache(ctx.chat.id);

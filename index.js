@@ -514,11 +514,13 @@ require('./handlers/group_filters').setupFilters(bot);
 require('./handlers/group_extras').setupExtras(bot);
 
 const { registerMessages } = require('./bot/messages');
+const { registerJoinRequests } = require('./handlers/group_join_requests');
 registerMessages(bot, {
   ownerH, GrpBuf, GrpMsgs, handleAiChat, handleOwnerAI,
   manage, browse, userH, bundlesDb, filesDb, adminsDb,
   logger, OWNER_ID, safeInt,
 });
+registerJoinRequests(bot);
 
 // ✏️ مكافحة تعديل الرسائل لتصبح مخالفة (anti_edit)
 bot.on('edited_message', async ctx => {
@@ -804,7 +806,7 @@ async function launch() {
 
     if (WEBHOOK_URL) {
       await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, {
-        allowed_updates: ['message', 'edited_message', 'callback_query', 'my_chat_member', 'chat_member', 'inline_query'],
+        allowed_updates: ['message', 'edited_message', 'callback_query', 'my_chat_member', 'chat_member', 'inline_query', 'chat_join_request'],
         drop_pending_updates: true,
         max_connections: 40,
         ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }),
