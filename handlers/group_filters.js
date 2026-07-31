@@ -316,6 +316,13 @@ function setupFilters(bot) {
     const m = await ctx.reply('🗑 تم حذف كل الفلاتر.').catch(() => null);
     if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 5000);
   });
+  bot.hears(/^(مسح_الفلاتر|احذف كل الفلاتر)$/, async ctx => {
+    if (!['group', 'supergroup'].includes(ctx.chat?.type)) return;
+    if (!ctx.isOwner && !ctx.isAdmin) return;
+    await clearAllFilters(ctx.chat.id);
+    const m = await ctx.reply('🗑 تم حذف كل الفلاتر.').catch(() => null);
+    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 5000);
+  });
 
   // /filters — عرض القائمة
   bot.command(['filters', 'الفلاتر', 'listfilters'], async ctx => {

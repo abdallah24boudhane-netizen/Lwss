@@ -518,14 +518,21 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   // 🗑 /purge — حذف رسائل بالجملة
   // ══════════════════════════════════════════
-  bot.command(["purge", "مسح"], async ctx => {
+  const purgeHandler = async ctx => {
     if (!isGroup(ctx)) return;
     if (!await isTgAdmin(ctx)) return ctx.reply("🚫 للمشرفين فقط").catch(() => {});
     delCmd(ctx);
     const replyTo = ctx.message.reply_to_message;
-    if (!replyTo) return ctx.reply("↩️ رد على أول رسالة تريد حذفها").catch(() => {});
-    const fromId  = replyTo.message_id;
-    const toId    = ctx.message.message_id - 1;
+    let fromId, toId;
+    if (replyTo) {
+      fromId = replyTo.message_id;
+      toId   = ctx.message.message_id - 1;
+    } else {
+      const n = parseInt((ctx.message.text || '').split(/\s+/)[1]);
+      if (!n || n < 1) return ctx.reply("↩️ رد على أول رسالة تريد حذفها، أو اكتب: مسح 50").catch(() => {});
+      toId   = ctx.message.message_id - 1;
+      fromId = Math.max(1, toId - Math.min(n, 100) + 1);
+    }
     if (toId < fromId) return ctx.reply("⚠️ ما في رسائل للحذف").catch(() => {});
     const total = toId - fromId + 1;
     if (total > 100) return ctx.reply("⚠️ الحد الأقصى 100 رسالة").catch(() => {});
@@ -541,7 +548,9 @@ function setupGroupCommands(bot) {
     if (m) await ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {});
     const done = await ctx.reply("✅ تم حذف " + deleted + " رسالة").catch(() => null);
     if (done) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, done.message_id).catch(() => {}), 4000);
-  });
+  };
+  bot.command(['purge', 'مسح'], purgeHandler);
+  bot.hears(/^مسح(?:\s+\d+)?$/, purgeHandler);
 
   // ══════════════════════════════════════════
   // 🗑 /del — حذف رسالة واحدة (رد عليها)

@@ -579,6 +579,7 @@ function setupProFeatures(bot) {
 
   // ⚠️ حد التحذيرات
   bot.command(['setwarnlimit', 'حد_التحذيرات'], handleSetWarnLimit);
+  bot.hears(/^حد_التحذيرات(?:\s+\d+)?$/, handleSetWarnLimit);
 
   // 📊 الأنشط
   bot.command(['topactive', 'الأنشط', 'نشاط', 'topusers'], handleTopActive);
@@ -597,6 +598,7 @@ function setupProFeatures(bot) {
 
   // 🔍 معلومات
   bot.command(['whois', 'معلومات_مستخدم'], handleWhois);
+  bot.hears(/^معلومات_مستخدم(?:\s+.+)?$/, handleWhois);
 
   // 🧹 purgeto
   bot.command(['purgeto', 'حذف_لحد'], handlePurgeTo);
