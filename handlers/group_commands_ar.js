@@ -281,6 +281,23 @@ function setupArabicModCommands(bot) {
     log(ctx, 'role_change', target, '⬇️ تخفيض إلى ' + roles.roleLabel(newRole));
     _reply(ctx, '⬇️ تم تخفيض *' + target.name + '* إلى *' + roles.roleLabel(newRole) + '*', 8000);
   });
+
+  // ══════════════════════════════════════════
+  // 🧹 مسح جماعي للرتب
+  // ══════════════════════════════════════════
+  const clearRolesHandler = (roleKey, label) => async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    delCmd(ctx);
+    const count = await roles.clearRoles(ctx.chat.id, roleKey);
+    log(ctx, 'roles_bulk_clear', { id: ctx.from.id, name: ctx.from.first_name || '' }, '🧹 مسح ' + label + ' (' + count + ')');
+    _reply(ctx, '🧹 تم مسح *' + label + '* — العدد: *' + count + '*', 8000);
+  };
+  bot.hears(/^مسح الادمنيه$/i, clearRolesHandler(null, 'كل الرتب الإدارية'));
+  bot.hears(/^مسح المدراء$/i, clearRolesHandler('manager', roles.ROLE_LABELS.manager));
+  bot.hears(/^مسح المشرفين العامين$/i, clearRolesHandler('super_admin', roles.ROLE_LABELS.super_admin));
+  bot.hears(/^مسح مشرفي الحمايه$/i, clearRolesHandler('protection_admin', roles.ROLE_LABELS.protection_admin));
+  bot.hears(/^مسح مشرفي المحتوى$/i, clearRolesHandler('content_admin', roles.ROLE_LABELS.content_admin));
+  bot.hears(/^مسح المساعدين$/i, clearRolesHandler('assistant', roles.ROLE_LABELS.assistant));
 }
 
 module.exports = { setupArabicModCommands };

@@ -11,6 +11,7 @@
  */
 
 const db = require('../database/group_pro_db');
+const { run: dbRun, all: dbAll } = require('../database/db');
 const { build: kbBuild, btn: kbBtn } = require('../utils/keyboard');
 const { eos } = require('../utils/helpers');
 const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
@@ -224,10 +225,27 @@ async function handleCallback(ctx, data, chatId) {
   return false;
 }
 
+// 🧹 مسح جماعي للرتب — roleKey = null يعني مسح كل الرتب دفعة واحدة
+async function clearRoles(chatId, roleKey) {
+  const rows = roleKey
+    ? await dbAll('SELECT user_id FROM group_roles WHERE chat_id=$1 AND role_key=$2', [chatId, roleKey]).catch(() => [])
+    : await dbAll('SELECT user_id FROM group_roles WHERE chat_id=$1', [chatId]).catch(() => []);
+
+  if (roleKey) {
+    await dbRun('DELETE FROM group_roles WHERE chat_id=$1 AND role_key=$2', [chatId, roleKey]).catch(() => {});
+  } else {
+    await dbRun('DELETE FROM group_roles WHERE chat_id=$1', [chatId]).catch(() => {});
+  }
+
+  for (const r of rows) clearRoleCache(chatId, r.user_id);
+  return rows.length;
+}
+
 module.exports = {
   ROLE_ORDER, ROLE_LABELS, ROLE_PERMS, PERM_LABELS,
   getEffectiveRole, hasPerm, clearRoleCache, roleLabel,
   showRolesMenu, showRolePerms, showRoleRemoveList,
   handleSetRoleCommand, handleRemoveRoleCommand,
+  clearRoles,
   handleCallback,
 };
