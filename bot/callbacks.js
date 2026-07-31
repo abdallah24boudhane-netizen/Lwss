@@ -240,6 +240,7 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'gm_',         fn: (ctx, d) => require('../handlers/group_members_panel').handleCallback(ctx, d) },
     { p: 'grp_main',    fn: (ctx, d) => { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? groupPanel.showMainMenu(ctx) : groupPanel.showMyGroups(ctx); } },
     { p: 'gp_jreq_',    fn: (ctx, d) => require('../handlers/group_join_requests').handleCallback(ctx, d) },
+    { p: 'gp_topicdel_', fn: (ctx, d) => require('../handlers/group_topics').handleCallback(ctx, d) },
     { p: 'gp_',         fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
     { p: 'help_',       fn: (ctx, d) => require('../handlers/group_pro_features').handleHelpCallback(ctx, d) },
     { p: 'phelp_',      fn: (ctx, d) => require('../handlers/group_pro_features').handleHelpCallback(ctx, d) },
