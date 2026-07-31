@@ -295,6 +295,8 @@ const PERMISSION_LOCK_MAP = {
   poll:    ['can_send_polls'],
   sticker: ['can_send_other_messages'],
   gif:     ['can_send_other_messages'],
+  file:    ['can_send_documents'],
+  chat:    ['can_send_messages'],
 };
 
 const PERMISSION_FIELDS = [

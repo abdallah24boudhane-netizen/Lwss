@@ -57,6 +57,8 @@ const LOCK_ALIASES = {
   video:   ['video', 'videos', 'فيديو', 'فيديوهات'],
   voice:   ['voice', 'audio', 'صوت', 'صوتي', 'صوتيات'],
   poll:    ['poll', 'polls', 'استطلاع', 'استطلاعات', 'تصويت'],
+  file:    ['file', 'files', 'document', 'documents', 'ملف', 'ملفات', 'مستند', 'مستندات'],
+  chat:    ['chat', 'دردشة', 'شات'],
 };
 function resolveLockType(arg) {
   arg = (arg || '').toLowerCase().trim();
