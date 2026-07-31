@@ -507,6 +507,7 @@ registerCallbacks(bot, {
 setupGroupCommands(bot);
 require('./handlers/group_commands_pro').setupProCommands(bot);
 require('./handlers/group_commands_ar').setupArabicModCommands(bot);
+setupTopicCommands(bot);
 require('./handlers/group_pro_features').setupProFeatures(bot);
 require('./handlers/group_schedule').setupSchedule(bot);
 require('./handlers/nations').setup(bot);
@@ -522,7 +523,6 @@ registerMessages(bot, {
   logger, OWNER_ID, safeInt,
 });
 registerJoinRequests(bot);
-setupTopicCommands(bot);
 
 // ✏️ مكافحة تعديل الرسائل لتصبح مخالفة (anti_edit)
 bot.on('edited_message', async ctx => {
