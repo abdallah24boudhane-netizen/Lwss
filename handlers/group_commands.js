@@ -1048,7 +1048,8 @@ async function showGamesMenu(ctx) {
 
 // helper: رسالة تُحذف تلقائياً
 function _reply(ctx, text, delay=10000) {
-  ctx.reply(text, { parse_mode: 'Markdown' })
+  const threadId = ctx.message?.message_thread_id;
+  ctx.reply(text, { parse_mode: 'Markdown', ...(threadId ? { message_thread_id: threadId } : {}) })
     .then(m => { if (m && delay) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), delay); })
     .catch(() => {});
 }

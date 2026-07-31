@@ -34,7 +34,8 @@ async function canAccessPanel(ctx, chatId) {
 function delCmd(ctx) { setTimeout(() => ctx.deleteMessage().catch(() => {}), 1500); }
 
 function tempReply(ctx, text, opts = {}, delay = 8000) {
-  ctx.reply(text, { parse_mode: 'Markdown', ...opts })
+  const threadId = ctx.message?.message_thread_id;
+  ctx.reply(text, { parse_mode: 'Markdown', ...(threadId ? { message_thread_id: threadId } : {}), ...opts })
     .then(m => { if (m && delay) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), delay); })
     .catch(() => {});
 }

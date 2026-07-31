@@ -515,12 +515,14 @@ require('./handlers/group_extras').setupExtras(bot);
 
 const { registerMessages } = require('./bot/messages');
 const { registerJoinRequests } = require('./handlers/group_join_requests');
+const { setupTopicCommands } = require('./handlers/group_topics');
 registerMessages(bot, {
   ownerH, GrpBuf, GrpMsgs, handleAiChat, handleOwnerAI,
   manage, browse, userH, bundlesDb, filesDb, adminsDb,
   logger, OWNER_ID, safeInt,
 });
 registerJoinRequests(bot);
+setupTopicCommands(bot);
 
 // ✏️ مكافحة تعديل الرسائل لتصبح مخالفة (anti_edit)
 bot.on('edited_message', async ctx => {
