@@ -149,6 +149,43 @@ function setupProCommands(bot) {
   bot.command('prohelp', showHelp);
   bot.hears('مساعدة الحماية', showHelp);
 
+  // ── ⚡ تفعيل/تعطيل سريع (حماية / تحقق / ترحيب / وداع / اشعارات) ──
+  const { run: _run, get: _get } = require('../database/db');
+
+  async function quickToggle(ctx, on, kind) {
+    if (!isGroup(ctx)) return;
+    if (!(await canAccessPanel(ctx, ctx.chat.id))) return tempReply(ctx, '🚫 هذا الأمر للمشرفين فقط.');
+    const chatId = ctx.chat.id;
+    try {
+      if (kind === 'protection') {
+        // ما فيه مفتاح واحد موحّد — نفعّل/نعطّل الأنواع الأساسية الثلاثة دفعة وحدة
+        await _run('UPDATE group_chats SET anti_spam=$1, anti_link=$1, anti_flood=$1 WHERE chat_id=$2', [on ? 1 : 0, chatId]);
+      } else if (kind === 'verify') {
+        await protection.updateSettings(chatId, { verify_enabled: on });
+      } else if (kind === 'welcome') {
+        await _run('UPDATE group_chats SET welcome_enabled=$1 WHERE chat_id=$2', [on ? 1 : 0, chatId]);
+      } else if (kind === 'goodbye') {
+        await _run('UPDATE group_chats SET goodbye_enabled=$1 WHERE chat_id=$2', [on ? 1 : 0, chatId]);
+      } else if (kind === 'notify') {
+        await _run('UPDATE group_chats SET notify_new_files=$1 WHERE chat_id=$2', [on ? 1 : 0, chatId]);
+      }
+      return ctx.reply((on ? '✅ تم التفعيل' : '❌ تم التعطيل')).catch(() => {});
+    } catch (e) {
+      return ctx.reply('❌ فشل: ' + e.message).catch(() => {});
+    }
+  }
+
+  bot.hears(/^تفعيل\s+حماية$/i,  ctx => quickToggle(ctx, true,  'protection'));
+  bot.hears(/^تعطيل\s+حماية$/i,  ctx => quickToggle(ctx, false, 'protection'));
+  bot.hears(/^تفعيل\s+تحقق$/i,   ctx => quickToggle(ctx, true,  'verify'));
+  bot.hears(/^تعطيل\s+تحقق$/i,   ctx => quickToggle(ctx, false, 'verify'));
+  bot.hears(/^تفعيل\s+ترحيب$/i,  ctx => quickToggle(ctx, true,  'welcome'));
+  bot.hears(/^تعطيل\s+ترحيب$/i,  ctx => quickToggle(ctx, false, 'welcome'));
+  bot.hears(/^تفعيل\s+وداع$/i,   ctx => quickToggle(ctx, true,  'goodbye'));
+  bot.hears(/^تعطيل\s+وداع$/i,   ctx => quickToggle(ctx, false, 'goodbye'));
+  bot.hears(/^تفعيل\s+اشعارات$/i, ctx => quickToggle(ctx, true,  'notify'));
+  bot.hears(/^تعطيل\s+اشعارات$/i, ctx => quickToggle(ctx, false, 'notify'));
+
   // ── 🚷 الكلمات المحظورة ──
   const addWordHandler = async ctx => {
     if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
