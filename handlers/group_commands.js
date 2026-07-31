@@ -37,10 +37,18 @@ async function getTarget(ctx) {
   const raw = args[0];
   if (/^\d+$/.test(raw)) return { id: parseInt(raw), name: 'ID:' + raw };
   if (raw.startsWith('@')) {
+    // ✅ Telegram API ما يدعمش تحويل @username لـ ID مباشرة عبر getChatMember
+    // (لازم رقم ID). نبحث بدلها فـ قاعدة بياناتنا (الأعضاء اللي البوت شافهم مسبقاً)
     try {
-      const u = await ctx.telegram.getChatMember(ctx.chat.id, raw);
-      return { id: u.user?.id, name: u.user?.first_name || raw };
-    } catch { return null; }
+      const { get } = require('../database/db');
+      const uname = raw.replace('@', '');
+      const row = await get(
+        'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND username ILIKE $2 LIMIT 1',
+        [ctx.chat.id, uname]
+      );
+      if (row) return { id: row.user_id, name: row.first_name || raw };
+    } catch { /* ignore */ }
+    return null;
   }
   return null;
 }

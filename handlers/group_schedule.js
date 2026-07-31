@@ -105,7 +105,11 @@ async function handleTempban(ctx) {
   const target = await getTarget(ctx);
   if (!target) return tmp(ctx, '⚠️ `/tempban @user 1h [سبب]`\nمثال: `30m` `2h` `1d`', 8);
 
-  const args = (ctx.message?.text || '').split(/\s+/).slice(target.fromReply ? 1 : 2);
+  // ✅ نحسب فعلياً كم كلمة استهلكها الـ trigger نفسو (سلاش = كلمة وحدة، "حظر مؤقت" = كلمتين)
+  const raw = (ctx.message?.text || '').trim();
+  const triggerWords = raw.startsWith('/') ? 1 : (raw.match(/^حظر\s+مؤقت/) ? 2 : 1);
+  const skip = triggerWords + (target.fromReply ? 0 : 1); // +1 كلمة زيادة إذا الهدف من النص (@user) مو من الرد
+  const args = raw.split(/\s+/).slice(skip);
   const secs = parseSec(args[0] || '1h');
   const reason = args.slice(1).join(' ') || 'حظر مؤقت';
   const unbanAt = new Date(Date.now() + secs * 1000);

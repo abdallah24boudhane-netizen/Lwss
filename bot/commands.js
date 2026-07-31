@@ -153,7 +153,14 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
     return ctx.reply('🔄 تم مسح سياق المحادثة.').catch(() => {});
   });
 
-  bot.command('promote', ctx => tools.batchPromote(ctx));
+  // ✅ /promote أُلغي من هنا — تعارض مع ترقية عضو القروب فـ group_commands.js
+  //    الأداة الحقيقية (owner tool) صارت باسم مختلف + بتحقق صلاحية owner إجباري
+  bot.command('addadmin', ctx => {
+    if (ctx.uid !== parseInt(process.env.OWNER_ID)) {
+      return ctx.reply('🚫 هذا الأمر للمالك فقط.').catch(() => {});
+    }
+    return tools.batchPromote(ctx);
+  });
 
   bot.command('cancel', async ctx => {
     const { setState } = require('../utils/stateManager');
