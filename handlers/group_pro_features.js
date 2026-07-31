@@ -435,7 +435,7 @@ const HELP_SECTIONS = {
   },
   protection: {
     label: '🔰 الحماية',
-    text: '🔰 *نظام الحماية*\n━━━━━━━━━━━━━━━━\n`/protection` أو `الحماية` — اللوحة الكاملة\n\nأنواع الحماية (من اللوحة):\n• anti_spam • anti_link • anti_flood\n• anti_forward • anti_mention • anti_words\n• anti_caps • anti_duplicate • anti_edit\n• anti_bot • anti_raid\n• anti_short_link • anti_invite\n• anti_media • anti_file\n\n`/lock [نوع]` أو `قفل` — قفل وسائط\n`/unlock [نوع]` أو `فتح` — فتح وسائط\nالأنواع: sticker gif link forward photo video voice poll\n`/setword [كلمة]` — إضافة كلمة محظورة\n`/delword [كلمة]` — حذف كلمة\n`/words` — القائمة',
+    text: '🔰 *نظام الحماية*\n━━━━━━━━━━━━━━━━\n`/protection` أو `الحماية` — اللوحة الكاملة\n\nأنواع الحماية (من اللوحة):\n• anti_spam • anti_link • anti_flood\n• anti_forward • anti_mention • anti_words\n• anti_caps • anti_duplicate • anti_edit\n• anti_bot • anti_raid\n• anti_short_link • anti_invite\n• anti_media • anti_file\n\n`/lock [نوع]` أو `قفل` — قفل وسائط\n`/unlock [نوع]` أو `فتح` — فتح وسائط\nالأنواع: sticker gif link forward photo video voice poll file chat\nمثال: `قفل شات` يمنع الكل من الكتابة إلا الأدمن\n`/setword [كلمة]` — إضافة كلمة محظورة\n`/delword [كلمة]` — حذف كلمة\n`/words` — القائمة',
   },
   roles: {
     label: '🎭 الرتب',
@@ -447,7 +447,11 @@ const HELP_SECTIONS = {
   },
   tools: {
     label: '🔧 أدوات',
-    text: '🔧 *الأدوات المتقدمة*\n━━━━━━━━━━━━━━━━\n`/schedule HH:MM رسالة` — جدولة رسالة\n`/watching @user` — مراقبة عضو\n`/unwatch @user` — إيقاف المراقبة\n`/slowmode [ثواني]` — وضع بطيء\n`/setjoin [رسالة]` — ترحيب مخصص\n  متغيرات: {name} {mention} {count} {group}\n`/rules` — قواعد القروب\n`/all [رسالة]` — منشن الكل\n`/verify` أو `التحقق` — التحقق من الأعضاء\n`/report` (رد) — بلاغ للمشرفين',
+    text: '🔧 *الأدوات المتقدمة*\n━━━━━━━━━━━━━━━━\n`/schedule HH:MM رسالة` — جدولة رسالة\n`/watching @user` — مراقبة عضو\n`/unwatch @user` — إيقاف المراقبة\n`/slowmode [ثواني]` — وضع بطيء\n`/setjoin [رسالة]` — ترحيب مخصص\n  متغيرات: {name} {mention} {count} {group}\n`/rules` — قواعد القروب\n`/all [رسالة]` — منشن الكل\n`/verify` أو `التحقق` — التحقق من الأعضاء\n`/report` (رد) — بلاغ للمشرفين\n\n🚪 *طلبات الانضمام* — تلقائي بالكامل: فعّل "الموافقة على الأعضاء" من إعدادات القروب، وتطلع بطاقة بزري ✅ قبول / ❌ رفض لكل طلب',
+  },
+  topics: {
+    label: '🧵 المواضيع',
+    text: '🧵 *إدارة المواضيع (Topics)*\n━━━━━━━━━━━━━━━━\n_تحتاج تفعيل Topics من إعدادات القروب + صلاحية "إدارة المواضيع" للبوت_\n\n`موضوع` أو `/topic` — معلومات الموضوع الحالي\n`موضوع انشاء [اسم]` — إنشاء موضوع جديد\n`موضوع تسمية [اسم]` — تعديل اسم الموضوع الحالي\n`موضوع اغلاق` — إغلاق الموضوع الحالي\n`موضوع فتح` — إعادة فتح الموضوع الحالي\n\nℹ️ أوامر الإدارة العادية (تحذير/كتم/حظر...) تشتغل عادي جوّا أي موضوع وتحافظ على مكانها',
   },
   games: {
     label: '🎮 الألعاب',
@@ -463,7 +467,8 @@ function buildHelpHomeKb() {
      { text: HELP_SECTIONS.roles.label,      callback_data: 'help_roles'      }],
     [{ text: HELP_SECTIONS.stats.label,      callback_data: 'help_stats'      },
      { text: HELP_SECTIONS.tools.label,      callback_data: 'help_tools'      }],
-    [{ text: HELP_SECTIONS.games.label,      callback_data: 'help_games'      }],
+    [{ text: HELP_SECTIONS.topics.label,     callback_data: 'help_topics'     },
+     { text: HELP_SECTIONS.games.label,      callback_data: 'help_games'      }],
   ]};
 }
 function buildBackKb() {
@@ -504,6 +509,10 @@ const PRIVATE_HELP_SECTIONS = {
   content: {
     label: '📚 المحتوى',
     text: '📚 *تصفح المحتوى*\n━━━━━━━━━━━━━━━━\n`/start` — القائمة الرئيسية\n`بحث [اسم]` — بحث سريع\n`جديد` — آخر الملفات المضافة\n`مفضلاتي` — ملفاتك المحفوظة\n`سجلي` — الملفات اللي حملتها\n`ملفي` — بروفايلك',
+  },
+  topics: {
+    label: '🧵 المواضيع',
+    text: '🧵 *إدارة المواضيع (Topics)*\n━━━━━━━━━━━━━━━━\n_تحتاج تفعيل Topics من إعدادات القروب + صلاحية "إدارة المواضيع" للبوت_\n\n`موضوع` أو `/topic` — معلومات الموضوع الحالي\n`موضوع انشاء [اسم]` — إنشاء موضوع جديد\n`موضوع تسمية [اسم]` — تعديل اسم الموضوع الحالي\n`موضوع اغلاق` — إغلاق الموضوع الحالي\n`موضوع فتح` — إعادة فتح الموضوع الحالي\n\nℹ️ أوامر الإدارة العادية (تحذير/كتم/حظر...) تشتغل عادي جوّا أي موضوع وتحافظ على مكانها',
   },
   games: {
     label: '🎮 الألعاب',
