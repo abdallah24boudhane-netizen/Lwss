@@ -191,8 +191,30 @@ async function showLocks(ctx, chatId) {
   text += '⚠️ الملصقات 🎭 والصور المتحركة 🎞 يتشاركان نفس قفل تيليجرام (قفل أحدهما يقفل الآخر تلقائياً).\n';
   text += '⚠️ الروابط 🔗 وإعادة التوجيه ↪️: تيليجرام لا يوفّر قفلاً مباشراً لهما، فيُحذف المحتوى فوراً بواسطة البوت.';
   const rows = db.LOCK_TYPES.map(t => [kbBtn((locks[t] ? '🔒 ' : '🔓 ') + LOCK_LABELS[t], 'gpx_locktog_' + t + '_' + chatId)]);
+  rows.push([kbBtn('🔒 قفل الكل', 'gpx_lockall_' + chatId), kbBtn('🔓 فتح الكل', 'gpx_unlockall_' + chatId)]);
   rows.push([kbBtn('◀️ رجوع', 'gpx_home_' + chatId)]);
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
+}
+
+// 🔒🔓 قفل/فتح كل الأنواع دفعة واحدة (يعتمد فقط على الأنواع المدعومة فعلياً حسب Telegram API)
+async function toggleAllLocks(ctx, chatId, lockAll) {
+  for (const t of db.LOCK_TYPES) {
+    await db.setLock(chatId, t, lockAll);
+  }
+  protection.clearLocksCache(chatId);
+
+  logsMod.logAction({ telegram: ctx.telegram }, chatId, 'lock_change', {
+    actorId: ctx.from.id, actorName: ctx.from.first_name || '',
+    details: lockAll ? '🔒 قفل الكل' : '🔓 فتح الكل',
+  }).catch(() => {});
+
+  const res = await protection.applyLockPermissions(ctx, chatId);
+  const toast = res.ok
+    ? (lockAll ? '🔒 تم قفل الكل على مستوى تيليجرام' : '🔓 تم فتح الكل على مستوى تيليجرام')
+    : (lockAll ? '🔒 تم القفل في البوت — أعط البوت صلاحية "تقييد الأعضاء" للتطبيق الكامل' : '🔓 تم الفتح في البوت — أعط البوت صلاحية "تقييد الأعضاء" للتطبيق الكامل');
+
+  ctx.answerCbQuery(toast, res.ok ? undefined : { show_alert: true }).catch(() => {});
+  return showLocks(ctx, chatId);
 }
 
 async function toggleLock(ctx, chatId, type) {
@@ -465,6 +487,8 @@ async function handleCallback(ctx, data) {
 
   if (rest === 'gpx_locks') return showLocks(ctx, chatId);
   if (rest.startsWith('gpx_locktog_')) return toggleLock(ctx, chatId, rest.replace('gpx_locktog_', ''));
+  if (rest === 'gpx_lockall')   return toggleAllLocks(ctx, chatId, true);
+  if (rest === 'gpx_unlockall') return toggleAllLocks(ctx, chatId, false);
 
   if (rest === 'gpx_punish') return showPunish(ctx, chatId);
   if (rest.startsWith('gpx_punishcyc_')) return cyclePunish(ctx, chatId, rest.replace('gpx_punishcyc_', ''));
