@@ -218,6 +218,23 @@ async function toggleAllLocks(ctx, chatId, lockAll) {
   return showLocks(ctx, chatId);
 }
 
+// 🎛️ تطبيق مجموعة أقفال محددة دفعة واحدة (يُستخدم من أوامر الـ Presets النصية)
+// activeTypes: مصفوفة الأنواع اللي لازم تكون مقفولة، الباقي يترك مفتوح
+async function applyPreset(ctx, chatId, activeTypes) {
+  const activeSet = new Set(activeTypes);
+  for (const t of db.LOCK_TYPES) {
+    await db.setLock(chatId, t, activeSet.has(t));
+  }
+  protection.clearLocksCache(chatId);
+
+  logsMod.logAction({ telegram: ctx.telegram }, chatId, 'lock_change', {
+    actorId: ctx.from.id, actorName: ctx.from.first_name || '',
+    details: '🎛 تطبيق نمط: ' + activeTypes.map(t => LOCK_LABELS[t] || t).join('، '),
+  }).catch(() => {});
+
+  return protection.applyLockPermissions(ctx, chatId);
+}
+
 async function toggleLock(ctx, chatId, type) {
   if (!db.LOCK_TYPES.includes(type)) return showLocks(ctx, chatId);
   const locks = await protection.getLocksCached(chatId);
@@ -516,5 +533,6 @@ module.exports = {
   showHome, showProtection, showAdvanced, showLocks, showPunish,
   showWords, showVerifyConfig, showStats,
   handleCallback, handleText,
+  applyPreset,
   splitChatId,
 };

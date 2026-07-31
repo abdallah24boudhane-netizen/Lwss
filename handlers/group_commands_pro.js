@@ -218,6 +218,19 @@ function setupProCommands(bot) {
   bot.hears(/^قفل\s+(.+)$/i, lockHandler(false));
   bot.hears(/^فتح\s+(.+)$/i, lockHandler(true));
 
+  // ── 🎛 أنماط جاهزة (Presets) — تطبق مجموعة أقفال دفعة واحدة ──
+  const presetHandler = (activeTypes, label) => async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    const res = await proPanel.applyPreset(ctx, ctx.chat.id, activeTypes);
+    const msg = res.ok
+      ? ('✅ تم تفعيل ' + label + ' على مستوى تيليجرام')
+      : ('✅ تم تفعيل ' + label + ' في البوت — أعط البوت صلاحية "تقييد الأعضاء" للتطبيق الكامل');
+    tempReply(ctx, msg, {}, 8000);
+    delCmd(ctx);
+  };
+  bot.hears(/^وضع الدراسة$/i, presetHandler(['sticker', 'gif', 'poll'], '📚 وضع الدراسة (منع: ملصقات/متحركة/تصويت)'));
+  bot.hears(/^وضع الوسائط$/i, presetHandler(['photo', 'video', 'voice', 'file', 'sticker', 'gif'], '🎥 وضع تقييد الوسائط (نص وروابط فقط)'));
+
   // ── 🎭 الرتب ──
   bot.command('setrole', async ctx => {
     if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
