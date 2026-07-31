@@ -507,6 +507,7 @@ registerCallbacks(bot, {
 setupGroupCommands(bot);
 require('./handlers/group_commands_pro').setupProCommands(bot);
 require('./handlers/group_commands_ar').setupArabicModCommands(bot);
+const { setupTopicCommands } = require('./handlers/group_topics');
 setupTopicCommands(bot);
 require('./handlers/group_pro_features').setupProFeatures(bot);
 require('./handlers/group_schedule').setupSchedule(bot);
@@ -516,7 +517,6 @@ require('./handlers/group_extras').setupExtras(bot);
 
 const { registerMessages } = require('./bot/messages');
 const { registerJoinRequests } = require('./handlers/group_join_requests');
-const { setupTopicCommands } = require('./handlers/group_topics');
 registerMessages(bot, {
   ownerH, GrpBuf, GrpMsgs, handleAiChat, handleOwnerAI,
   manage, browse, userH, bundlesDb, filesDb, adminsDb,
