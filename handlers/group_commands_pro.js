@@ -59,6 +59,9 @@ const LOCK_ALIASES = {
   poll:    ['poll', 'polls', 'استطلاع', 'استطلاعات', 'تصويت'],
   file:    ['file', 'files', 'document', 'documents', 'ملف', 'ملفات', 'مستند', 'مستندات'],
   chat:    ['chat', 'دردشة', 'شات'],
+  invite:  ['invite', 'دعوة', 'اضافة اعضاء', 'إضافة أعضاء'],
+  pin:     ['pin', 'تثبيت'],
+  info:    ['info', 'تعديل معلومات', 'معلومات القروب'],
 };
 function resolveLockType(arg) {
   arg = (arg || '').toLowerCase().trim();

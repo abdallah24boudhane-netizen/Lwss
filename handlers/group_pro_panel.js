@@ -88,6 +88,7 @@ const LOCK_LABELS = {
   sticker: '🎭 الملصقات', gif: '🎞 الصور المتحركة', link: '🔗 الروابط', forward: '↪️ إعادة التوجيه',
   photo: '🖼 الصور', video: '🎬 الفيديو', voice: '🎤 الصوتيات/المقاطع', poll: '📊 الاستطلاعات',
   file: '📄 الملفات', chat: '💬 الدردشة بالكامل',
+  invite: '🔗 دعوة أعضاء', pin: '📌 صلاحية التثبيت', info: '✏️ تعديل معلومات القروب',
 };
 
 const ACTION_CYCLE = ['warn', 'mute_10', 'mute_60', 'mute_360', 'mute_1440', 'kick', 'ban', 'none'];

@@ -145,6 +145,9 @@ async function migrate() {
      )`,
     `ALTER TABLE group_locks ADD COLUMN IF NOT EXISTS lock_file SMALLINT DEFAULT 0`,
     `ALTER TABLE group_locks ADD COLUMN IF NOT EXISTS lock_chat SMALLINT DEFAULT 0`,
+    `ALTER TABLE group_locks ADD COLUMN IF NOT EXISTS lock_invite SMALLINT DEFAULT 0`,
+    `ALTER TABLE group_locks ADD COLUMN IF NOT EXISTS lock_pin SMALLINT DEFAULT 0`,
+    `ALTER TABLE group_locks ADD COLUMN IF NOT EXISTS lock_info SMALLINT DEFAULT 0`,
   ];
 
   for (const q of queries) {
@@ -359,7 +362,7 @@ async function countWords(chatId) {
 // ══════════════════════════════════════════════════════════
 // 🔒 أقفال الوسائط (يعاد استخدام group_locks)
 // ══════════════════════════════════════════════════════════
-const LOCK_TYPES = ['sticker', 'gif', 'link', 'forward', 'photo', 'video', 'voice', 'poll', 'file', 'chat'];
+const LOCK_TYPES = ['sticker', 'gif', 'link', 'forward', 'photo', 'video', 'voice', 'poll', 'file', 'chat', 'invite', 'pin', 'info'];
 
 async function getLocks(chatId) {
   const r = await get('SELECT * FROM group_locks WHERE chat_id=$1', [chatId]).catch(() => null);

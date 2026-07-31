@@ -297,6 +297,9 @@ const PERMISSION_LOCK_MAP = {
   gif:     ['can_send_other_messages'],
   file:    ['can_send_documents'],
   chat:    ['can_send_messages'],
+  invite:  ['can_invite_users'],
+  pin:     ['can_pin_messages'],
+  info:    ['can_change_info'],
 };
 
 const PERMISSION_FIELDS = [
