@@ -214,8 +214,13 @@ async function toggleAllLocks(ctx, chatId, lockAll) {
     ? (lockAll ? '🔒 تم قفل الكل على مستوى تيليجرام' : '🔓 تم فتح الكل على مستوى تيليجرام')
     : (lockAll ? '🔒 تم القفل في البوت — أعط البوت صلاحية "تقييد الأعضاء" للتطبيق الكامل' : '🔓 تم الفتح في البوت — أعط البوت صلاحية "تقييد الأعضاء" للتطبيق الكامل');
 
-  ctx.answerCbQuery(toast, res.ok ? undefined : { show_alert: true }).catch(() => {});
-  return showLocks(ctx, chatId);
+  // ✅ تتصرف حسب السياق: زر (callback) أو أمر نصي عادي — answerCbQuery موجودة بالأزرار بس
+  if (ctx.callbackQuery) {
+    ctx.answerCbQuery(toast, res.ok ? undefined : { show_alert: true }).catch(() => {});
+    return showLocks(ctx, chatId);
+  }
+  const m = await ctx.reply(toast).catch(() => null);
+  if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 8000);
 }
 
 // 🎛️ تطبيق مجموعة أقفال محددة دفعة واحدة (يُستخدم من أوامر الـ Presets النصية)
