@@ -507,7 +507,9 @@ registerCallbacks(bot, {
 setupGroupCommands(bot);
 require('./handlers/group_commands_pro').setupProCommands(bot);
 require('./handlers/group_commands_ar').setupArabicModCommands(bot);
-const { setupTopicCommands } = require('./handlers/group_topics');
+const { setupTopicCommands, trackTopicMiddleware, ensureTopicsTable } = require('./handlers/group_topics');
+ensureTopicsTable().catch(() => {});
+trackTopicMiddleware(bot);
 const { setupPromoteCommands } = require('./handlers/group_promote_panel');
 setupPromoteCommands(bot);
 setupTopicCommands(bot);

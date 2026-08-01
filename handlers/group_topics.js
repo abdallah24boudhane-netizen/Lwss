@@ -2,6 +2,42 @@
 // ══════════════════════════════════════════════════════════
 // 🧵 إدارة المواضيع (Topics) — ملف مستقل، لا يلمس group_protection.js
 // ══════════════════════════════════════════════════════════
+const { run: dbRun, all: dbAll } = require('../database/db');
+
+let _tableReady = false;
+async function ensureTopicsTable() {
+  if (_tableReady) return;
+  try {
+    await dbRun(`CREATE TABLE IF NOT EXISTS group_known_topics(
+      chat_id BIGINT NOT NULL,
+      thread_id BIGINT NOT NULL,
+      name TEXT,
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      PRIMARY KEY(chat_id, thread_id)
+    )`);
+  } catch (e) { /* موجود أصلاً غالباً */ }
+  _tableReady = true;
+}
+
+// 📡 تتبّع خفيف: كل رسالة توصل جوّا Topic نسجّل الـ thread_id تاعو
+// (Telegram Bot API ما عندهاش method ترجّع كل المواضيع دفعة وحدة — نبنيها بأنفسنا)
+function trackTopicMiddleware(bot) {
+  bot.on('message', (ctx, next) => {
+    try {
+      const threadId = ctx.message?.message_thread_id;
+      if (threadId && isGroup(ctx)) {
+        const name = ctx.message?.reply_to_message?.forum_topic_created?.name || null;
+        dbRun(
+          `INSERT INTO group_known_topics(chat_id,thread_id,name,updated_at) VALUES($1,$2,$3,NOW())
+           ON CONFLICT(chat_id,thread_id) DO UPDATE SET
+             name=COALESCE(EXCLUDED.name, group_known_topics.name), updated_at=NOW()`,
+          [ctx.chat.id, threadId, name]
+        ).catch(() => {});
+      }
+    } catch (e) { /* silent */ }
+    return next();
+  });
+}
 
 function isGroup(ctx) { return ['group', 'supergroup'].includes(ctx.chat?.type); }
 
@@ -132,6 +168,10 @@ function setupTopicCommands(bot) {
       { parse_mode: 'Markdown', reply_markup: kb, message_thread_id: threadId }).catch(() => {});
   };
   bot.hears(/^موضوع\s+حذف$/i, deleteHandler);
+
+  // 🔒🔓 إغلاق/فتح كل المواضيع المعروفة دفعة واحدة
+  bot.hears(/^(قفل التوبيكات|اغلاق كل المواضيع|قفل المواضيع|اغلاق المواضيع)$/i, ctx => closeOrOpenAll(ctx, true));
+  bot.hears(/^(فتح التوبيكات|فتح كل المواضيع|فتح المواضيع)$/i, ctx => closeOrOpenAll(ctx, false));
 }
 
 // 🎛️ تأكيد/إلغاء حذف الموضوع (يُستدعى من bot/callbacks.js)
@@ -170,4 +210,31 @@ async function isTgAdminOrOwnerFor(ctx, chatId) {
   } catch (e) { return false; }
 }
 
-module.exports = { setupTopicCommands, getThreadId, handleCallback };
+async function closeOrOpenAll(ctx, close) {
+  if (!isGroup(ctx)) return;
+  if (!(await isTgAdminOrOwner(ctx))) return reply(ctx, '🚫 للمشرفين فقط.');
+  await ensureTopicsTable();
+  const chatId = ctx.chat.id;
+  const topics = await dbAll('SELECT thread_id FROM group_known_topics WHERE chat_id=$1', [chatId]).catch(() => []);
+  if (!topics.length) {
+    return reply(ctx, '📭 ماكاينش مواضيع معروفة عندي بعد لهذا القروب.\n_(البوت يتعرف على المواضيع بس كي توصلو رسالة فيها، أو ينشئها بنفسه)_');
+  }
+
+  const msg = await ctx.reply('⏳ جارٍ ' + (close ? 'إغلاق' : 'فتح') + ' ' + topics.length + ' موضوع...').catch(() => null);
+  let done = 0, failed = 0;
+  for (const t of topics) {
+    try {
+      await ctx.telegram.callApi(close ? 'closeForumTopic' : 'reopenForumTopic', {
+        chat_id: chatId, message_thread_id: t.thread_id,
+      });
+      done++;
+    } catch (e) { failed++; }
+    await new Promise(r => setTimeout(r, 200)); // احترام حدود تيليجرام
+  }
+
+  const text = (close ? '🔒 تم إغلاق ' : '🔓 تم فتح ') + done + ' موضوع' + (failed ? ' (فشل ' + failed + ')' : '');
+  if (msg) await ctx.telegram.editMessageText(chatId, msg.message_id, null, text).catch(() => {});
+  else ctx.reply(text).catch(() => {});
+}
+
+module.exports = { setupTopicCommands, getThreadId, handleCallback, trackTopicMiddleware, ensureTopicsTable, closeOrOpenAll };
