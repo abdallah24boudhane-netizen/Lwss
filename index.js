@@ -508,6 +508,8 @@ setupGroupCommands(bot);
 require('./handlers/group_commands_pro').setupProCommands(bot);
 require('./handlers/group_commands_ar').setupArabicModCommands(bot);
 const { setupTopicCommands } = require('./handlers/group_topics');
+const { setupPromoteCommands } = require('./handlers/group_promote_panel');
+setupPromoteCommands(bot);
 setupTopicCommands(bot);
 require('./handlers/group_pro_features').setupProFeatures(bot);
 require('./handlers/group_schedule').setupSchedule(bot);
