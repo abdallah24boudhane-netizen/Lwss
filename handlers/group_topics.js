@@ -170,8 +170,8 @@ function setupTopicCommands(bot) {
   bot.hears(/^موضوع\s+حذف$/i, deleteHandler);
 
   // 🔒🔓 إغلاق/فتح كل المواضيع المعروفة دفعة واحدة
-  bot.hears(/^(قفل التوبيكات|اغلاق كل المواضيع|قفل المواضيع|اغلاق المواضيع)$/i, ctx => closeOrOpenAll(ctx, true));
-  bot.hears(/^(فتح التوبيكات|فتح كل المواضيع|فتح المواضيع)$/i, ctx => closeOrOpenAll(ctx, false));
+  bot.hears(/^(قفل التوبيكات|قفل توبيكات|اغلاق كل المواضيع|قفل المواضيع|اغلاق المواضيع|اغلقهم|قفلهم)$/i, ctx => closeOrOpenAll(ctx, true));
+  bot.hears(/^(فتح التوبيكات|فتح توبيكات|فتح كل المواضيع|فتح المواضيع|افتحهم|افتحوهم)$/i, ctx => closeOrOpenAll(ctx, false));
 }
 
 // 🎛️ تأكيد/إلغاء حذف الموضوع (يُستدعى من bot/callbacks.js)
