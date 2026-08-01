@@ -193,6 +193,8 @@ async function handleCallback(ctx, data) {
 
   try {
     await ctx.telegram.callApi('deleteForumTopic', { chat_id: chatId, message_thread_id: threadId });
+    // ✅ نشيله من قائمة المواضيع المعروفة، وإلا "قفل/فتح التوبيكات" تحاول تشتغل على موضوع محذوف
+    await dbRun('DELETE FROM group_known_topics WHERE chat_id=$1 AND thread_id=$2', [chatId, threadId]).catch(() => {});
     await ctx.editMessageText('🗑 تم حذف الموضوع نهائياً.').catch(() => {});
     await ctx.answerCbQuery('🗑 تم الحذف').catch(() => {});
   } catch (e) {
