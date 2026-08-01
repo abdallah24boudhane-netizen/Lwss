@@ -234,6 +234,55 @@ async function handleTopActive(ctx) {
 function setupExtras(bot) {
   // 🚨 Report
   bot.command(['report', 'بلاغ'], handleReport);
+
+  // ── 🤖 كشف وحذف البوتات + تنظيف المحظورين ──
+  // ⚠️ قيد Telegram API: البوت يقدر يفحص بس الأعضاء المسجلين عندو مسبقاً فـ group_members
+  // (اللي بعتو رسالة قبل)، ماشي كل أعضاء القروب — تيليجرام ما يعطيش قائمة كاملة للبوتات.
+  const cleanupHandler = async ctx => {
+    if (!['group', 'supergroup'].includes(ctx.chat?.type)) return;
+    if (!ctx.isOwner && !ctx.isAdmin) {
+      try {
+        const m = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+        if (!['administrator', 'creator'].includes(m?.status)) return;
+      } catch { return; }
+    }
+    const chatId = ctx.chat.id;
+    const known = await all('SELECT user_id, first_name FROM group_members WHERE chat_id=$1', [chatId]).catch(() => []);
+    if (!known.length) return ctx.reply('📭 مافيش أعضاء مسجلين عندي فهاذ القروب بعد.').catch(() => {});
+
+    const msg = await ctx.reply('🔍 جاري فحص ' + known.length + ' عضو مسجّل...').catch(() => null);
+    let removedBots = 0, removedGone = 0, checked = 0;
+
+    for (const row of known) {
+      checked++;
+      try {
+        const member = await ctx.telegram.getChatMember(chatId, row.user_id);
+        if (member.user?.is_bot && member.user.id !== ctx.botInfo?.id) {
+          await ctx.telegram.banChatMember(chatId, row.user_id).catch(() => {});
+          await run('DELETE FROM group_members WHERE chat_id=$1 AND user_id=$2', [chatId, row.user_id]).catch(() => {});
+          removedBots++;
+        } else if (['left', 'kicked'].includes(member.status)) {
+          await run('DELETE FROM group_members WHERE chat_id=$1 AND user_id=$2', [chatId, row.user_id]).catch(() => {});
+          removedGone++;
+        }
+      } catch (e) {
+        await run('DELETE FROM group_members WHERE chat_id=$1 AND user_id=$2', [chatId, row.user_id]).catch(() => {});
+        removedGone++;
+      }
+      if (checked % 15 === 0) await new Promise(r => setTimeout(r, 300));
+    }
+
+    if (msg) await ctx.telegram.deleteMessage(chatId, msg.message_id).catch(() => {});
+    return ctx.reply(
+      '✅ *انتهى الفحص*\n\n' +
+      '👥 فُحص: ' + checked + '\n' +
+      '🤖 بوتات مطرودة: ' + removedBots + '\n' +
+      '🧹 سجلات منظّفة (غادروا/محظورين): ' + removedGone,
+      { parse_mode: 'Markdown' }
+    ).catch(() => {});
+  };
+  bot.command(['cleanbots', 'حذف_بوتات', 'كشف_بوتات'], cleanupHandler);
+  bot.hears(/^(حذف_بوتات|كشف_بوتات|حذف بوتات|كشف بوتات|حذف المحظورين)$/, cleanupHandler);
   bot.hears(/^بلاغ(?:\s+(.+))?$/, async ctx => {
     ctx.message.text = '/report ' + (ctx.match[1] || '');
     return handleReport(ctx);
