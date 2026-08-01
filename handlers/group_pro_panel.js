@@ -533,6 +533,6 @@ module.exports = {
   showHome, showProtection, showAdvanced, showLocks, showPunish,
   showWords, showVerifyConfig, showStats,
   handleCallback, handleText,
-  applyPreset,
+  applyPreset, toggleAllLocks,
   splitChatId,
 };

@@ -574,6 +574,7 @@ function setupProFeatures(bot) {
 
   // ✅ استثناء
   bot.command(['approve', 'استثناء'],  handleApprove);
+  bot.hears(/^(موافقة|استثناء)(?:\s+.+)?$/, handleApprove);
   bot.command(['unapprove', 'الغاء_استثناء'], handleUnapprove);
   bot.command(['approved',  'المستثنون'],  handleApprovedList);
 

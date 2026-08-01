@@ -65,8 +65,9 @@ const LOCK_ALIASES = {
 };
 function resolveLockType(arg) {
   arg = (arg || '').toLowerCase().trim();
+  const argNoAl = arg.startsWith('ال') ? arg.slice(2) : arg; // ✅ يتجاهل "ال" التعريف (مثلاً "التصويت" == "تصويت")
   for (const [type, aliases] of Object.entries(LOCK_ALIASES)) {
-    if (aliases.some(a => a.toLowerCase() === arg)) return type;
+    if (aliases.some(a => { const al = a.toLowerCase(); return al === arg || al === argNoAl; })) return type;
   }
   return null;
 }
@@ -222,8 +223,7 @@ function setupProCommands(bot) {
     if (!isGroup(ctx)) return;
     return proPanel.showWords(ctx, ctx.chat.id);
   };
-  bot.command('words', showWordsHandler);
-  bot.hears('الكلمات المحظورة', showWordsHandler);
+  // ⚠️ أُزيل الظهور بالقروب بناءً على طلب صريح — متاحة فقط عبر لوحة الحماية (🚷 الكلمات المحظورة)
 
   // ── 🔒 الأقفال السريعة ──
   const lockHandler = (unlock) => async ctx => {
@@ -267,6 +267,15 @@ function setupProCommands(bot) {
   };
   bot.hears(/^وضع الدراسة$/i, presetHandler(['sticker', 'gif', 'poll'], '📚 وضع الدراسة (منع: ملصقات/متحركة/تصويت)'));
   bot.hears(/^وضع الوسائط$/i, presetHandler(['photo', 'video', 'voice', 'file', 'sticker', 'gif'], '🎥 وضع تقييد الوسائط (نص وروابط فقط)'));
+
+  // ── 🔒🔓 قفل الكل / فتح الكل كأوامر نصية (نفس منطق زر اللوحة) ──
+  const lockAllHandler = (lockAll) => async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    await proPanel.toggleAllLocks(ctx, ctx.chat.id, lockAll);
+    delCmd(ctx);
+  };
+  bot.hears(/^(قفل الكل|قفل كل شي)$/i, lockAllHandler(true));
+  bot.hears(/^(فتح الكل|فتح كل شي)$/i, lockAllHandler(false));
 
   // ── 🎭 الرتب ──
   bot.command('setrole', async ctx => {
