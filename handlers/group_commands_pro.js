@@ -250,6 +250,15 @@ function setupProCommands(bot) {
     tempReply(ctx, msg, {}, 8000);
     delCmd(ctx);
   };
+  // ── 🔒🔓 قفل الكل / فتح الكل — لازم قبل الأمر العام 'قفل/فتح <نوع>' وإلا 'الكل' تتفسر كنوع مجهول ──
+  const lockAllHandler = (lockAll) => async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    await proPanel.toggleAllLocks(ctx, ctx.chat.id, lockAll);
+    delCmd(ctx);
+  };
+  bot.hears(/^(قفل الكل|قفل كل شي)$/i, lockAllHandler(true));
+  bot.hears(/^(فتح الكل|فتح كل شي)$/i, lockAllHandler(false));
+
   bot.command('lock', lockHandler(false));
   bot.command('unlock', lockHandler(true));
   bot.hears(/^قفل\s+(.+)$/i, lockHandler(false));
@@ -268,14 +277,6 @@ function setupProCommands(bot) {
   bot.hears(/^وضع الدراسة$/i, presetHandler(['sticker', 'gif', 'poll'], '📚 وضع الدراسة (منع: ملصقات/متحركة/تصويت)'));
   bot.hears(/^وضع الوسائط$/i, presetHandler(['photo', 'video', 'voice', 'file', 'sticker', 'gif'], '🎥 وضع تقييد الوسائط (نص وروابط فقط)'));
 
-  // ── 🔒🔓 قفل الكل / فتح الكل كأوامر نصية (نفس منطق زر اللوحة) ──
-  const lockAllHandler = (lockAll) => async ctx => {
-    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
-    await proPanel.toggleAllLocks(ctx, ctx.chat.id, lockAll);
-    delCmd(ctx);
-  };
-  bot.hears(/^(قفل الكل|قفل كل شي)$/i, lockAllHandler(true));
-  bot.hears(/^(فتح الكل|فتح كل شي)$/i, lockAllHandler(false));
 
   // ── 🎭 الرتب ──
   bot.command('setrole', async ctx => {
