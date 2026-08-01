@@ -29,13 +29,13 @@ async function getTarget(ctx) {
   // من الرد
   if (msg.reply_to_message?.from) {
     const u = msg.reply_to_message.from;
-    return { id: u.id, name: u.first_name || 'مستخدم' };
+    return { id: u.id, name: u.first_name || 'مستخدم', fromReply: true };
   }
   // من النص: /ban @username أو /ban 123456
   const args = msg.text?.split(' ').slice(1) || [];
   if (!args.length) return null;
   const raw = args[0];
-  if (/^\d+$/.test(raw)) return { id: parseInt(raw), name: 'ID:' + raw };
+  if (/^\d+$/.test(raw)) return { id: parseInt(raw), name: 'ID:' + raw, fromReply: false };
   if (raw.startsWith('@')) {
     // ✅ Telegram API ما يدعمش تحويل @username لـ ID مباشرة عبر getChatMember
     // (لازم رقم ID). نبحث بدلها فـ قاعدة بياناتنا (الأعضاء اللي البوت شافهم مسبقاً)
@@ -46,7 +46,7 @@ async function getTarget(ctx) {
         'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND username ILIKE $2 LIMIT 1',
         [ctx.chat.id, uname]
       );
-      if (row) return { id: row.user_id, name: row.first_name || raw };
+      if (row) return { id: row.user_id, name: row.first_name || raw, fromReply: false };
     } catch { /* ignore */ }
     return null;
   }
