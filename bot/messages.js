@@ -599,7 +599,24 @@ module.exports.registerMessages = function(bot, deps) {
       const member = ctx.chatMember?.new_chat_member;
       const old    = ctx.chatMember?.old_chat_member;
       if (!chat || chat.type === "private") return;
-      if (member?.user?.is_bot) return;
+      if (member?.user?.is_bot) {
+        // ✅ نسجّل البوتات فـ group_members (is_bot=1) باش تظهر لأوامر كشف/طرد البوتات
+        // بلا ما نفعّل عليهم ترحيب/تحقق/anti-raid (هذا سلوك صحيح ويبقى كيفما هو)
+        const u = member.user;
+        const { run: _runBot } = require('../database/db');
+        if (['member', 'restricted', 'administrator', 'creator'].includes(member.status)) {
+          _runBot(
+            `INSERT INTO group_members(chat_id,user_id,username,first_name,is_bot,updated_at)
+             VALUES($1,$2,$3,$4,1,CURRENT_TIMESTAMP)
+             ON CONFLICT(chat_id,user_id) DO UPDATE
+               SET username=EXCLUDED.username, first_name=EXCLUDED.first_name, is_bot=1, updated_at=CURRENT_TIMESTAMP`,
+            [chat.id, u.id, u.username || '', u.first_name || 'بوت']
+          ).catch(() => {});
+        } else if (['left', 'kicked'].includes(member.status)) {
+          _runBot('DELETE FROM group_members WHERE chat_id=$1 AND user_id=$2', [chat.id, u.id]).catch(() => {});
+        }
+        return;
+      }
       const wasOut = ["left","kicked"].includes(old?.status);
       const isIn   = ["member","restricted","administrator","creator"].includes(member?.status);
       const isOut  = ["left","kicked"].includes(member?.status);
