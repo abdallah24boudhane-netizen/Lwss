@@ -505,14 +505,17 @@ registerCallbacks(bot, {
 
 // ── Messages ──
 setupGroupCommands(bot);
-require('./handlers/group_commands_pro').setupProCommands(bot);
-require('./handlers/group_commands_ar').setupArabicModCommands(bot);
+
+// ✅ Topics لازم تتسجل قبل أوامر القفل العامة (قفل/فتح <نوع>) وإلا "قفل التوبيكات" تتفسر كنوع مجهول
 const { setupTopicCommands, trackTopicMiddleware, ensureTopicsTable } = require('./handlers/group_topics');
 ensureTopicsTable().catch(() => {});
 trackTopicMiddleware(bot);
+setupTopicCommands(bot);
+
+require('./handlers/group_commands_pro').setupProCommands(bot);
+require('./handlers/group_commands_ar').setupArabicModCommands(bot);
 const { setupPromoteCommands } = require('./handlers/group_promote_panel');
 setupPromoteCommands(bot);
-setupTopicCommands(bot);
 require('./handlers/group_pro_features').setupProFeatures(bot);
 require('./handlers/group_schedule').setupSchedule(bot);
 require('./handlers/nations').setup(bot);
