@@ -550,7 +550,6 @@ function setupGroupCommands(bot) {
     if (done) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, done.message_id).catch(() => {}), 4000);
   };
   bot.command(['purge', 'مسح'], purgeHandler);
-  bot.hears(/^مسح(?:\s+\d+)?$/i, purgeHandler);
   bot.hears(/^مسح(?:\s+\d+)?$/, purgeHandler);
 
   // ══════════════════════════════════════════
