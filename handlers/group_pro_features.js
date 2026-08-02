@@ -484,8 +484,8 @@ async function showHelpHome(ctx) {
   if (!isCallback && ['group', 'supergroup'].includes(ctx.chat?.type)) {
     const fileId = await require('./group_help_pdf').getGlobalHelpFileId().catch(() => null);
     if (fileId) {
-      setTimeout(() => ctx.deleteMessage().catch(() => {}), 1000);
-      return ctx.replyWithDocument(fileId).catch(() => {});
+      // ✅ رد حقيقي على رسالة "اوامر" نفسها (بلا حذفها، وإلا يضيع سياق الرد)
+      return ctx.replyWithDocument(fileId, { reply_to_message_id: ctx.message.message_id }).catch(() => {});
     }
   }
 
