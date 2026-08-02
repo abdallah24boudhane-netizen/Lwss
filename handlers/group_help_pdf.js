@@ -1,28 +1,17 @@
 'use strict';
 // ══════════════════════════════════════════════════════════
-// 📄 ملف PDF مخصص لأمر "اوامر" — الأدمن يرفع ملفه الخاص بدل لوحة الأزرار
-// ملف مستقل تماماً
+// 📄 ملف PDF عام لأمر "اوامر" — يُعيَّن من الخاص من طرف المالك فقط
+// ويشتغل على كل القروبات دفعة واحدة
 // ══════════════════════════════════════════════════════════
 const { run: dbRun, get: dbGet } = require('../database/db');
-
-function isGroup(ctx) { return ['group', 'supergroup'].includes(ctx.chat?.type); }
-
-async function isTgAdminOrOwner(ctx) {
-  const uid = ctx.from?.id;
-  if (Number(uid) === Number(process.env.OWNER_ID)) return true;
-  try {
-    const m = await ctx.telegram.getChatMember(ctx.chat.id, uid);
-    return ['administrator', 'creator'].includes(m?.status);
-  } catch (e) { return false; }
-}
 
 let _tableReady = false;
 async function ensureTable() {
   if (_tableReady) return;
   try {
-    await dbRun(`CREATE TABLE IF NOT EXISTS group_help_files(
-      chat_id BIGINT PRIMARY KEY,
-      file_id TEXT NOT NULL,
+    await dbRun(`CREATE TABLE IF NOT EXISTS global_help_file(
+      id INTEGER PRIMARY KEY DEFAULT 1,
+      file_id TEXT,
       set_by BIGINT,
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )`);
@@ -30,32 +19,36 @@ async function ensureTable() {
   _tableReady = true;
 }
 
-async function getHelpFileId(chatId) {
+async function getGlobalHelpFileId() {
   await ensureTable();
-  const row = await dbGet('SELECT file_id FROM group_help_files WHERE chat_id=$1', [chatId]).catch(() => null);
+  const row = await dbGet('SELECT file_id FROM global_help_file WHERE id=1', []).catch(() => null);
   return row?.file_id || null;
 }
 
+function isOwner(ctx) {
+  return Number(ctx.from?.id) === Number(process.env.OWNER_ID);
+}
+
 async function setHandler(ctx) {
-  if (!isGroup(ctx)) return;
-  if (!(await isTgAdminOrOwner(ctx))) return ctx.reply('🚫 للمشرفين فقط.').catch(() => {});
+  if (ctx.chat?.type !== 'private') return; // ✅ من الخاص فقط
+  if (!isOwner(ctx)) return ctx.reply('🚫 هذا الأمر للمالك فقط.').catch(() => {});
   const doc = ctx.message.reply_to_message?.document;
-  if (!doc) return ctx.reply('⚠️ رُد على ملف (PDF أو أي مستند) بهذا الأمر: تعيين ملف الاوامر').catch(() => {});
+  if (!doc) return ctx.reply('⚠️ رُد على ملف (PDF أو أي مستند) بهذا الأمر: تعيين الاوامر').catch(() => {});
   await ensureTable();
   await dbRun(
-    `INSERT INTO group_help_files(chat_id, file_id, set_by, updated_at) VALUES($1,$2,$3,NOW())
-     ON CONFLICT(chat_id) DO UPDATE SET file_id=$2, set_by=$3, updated_at=NOW()`,
-    [ctx.chat.id, doc.file_id, ctx.from.id]
+    `INSERT INTO global_help_file(id, file_id, set_by, updated_at) VALUES(1,$1,$2,NOW())
+     ON CONFLICT(id) DO UPDATE SET file_id=$1, set_by=$2, updated_at=NOW()`,
+    [doc.file_id, ctx.from.id]
   ).catch(() => {});
-  ctx.reply('✅ تم تعيين هذا الملف — كل من يكتب "اوامر" رح يوصله مباشرة من الآن.').catch(() => {});
+  ctx.reply('✅ تم تعيين هذا الملف كملف "اوامر" العام — كل عضو بأي قروب يكتب "اوامر" رح يوصله من الآن.').catch(() => {});
 }
 
 async function clearHandler(ctx) {
-  if (!isGroup(ctx)) return;
-  if (!(await isTgAdminOrOwner(ctx))) return ctx.reply('🚫 للمشرفين فقط.').catch(() => {});
+  if (ctx.chat?.type !== 'private') return;
+  if (!isOwner(ctx)) return ctx.reply('🚫 هذا الأمر للمالك فقط.').catch(() => {});
   await ensureTable();
-  await dbRun('DELETE FROM group_help_files WHERE chat_id=$1', [ctx.chat.id]).catch(() => {});
-  ctx.reply('🗑 تم حذف الملف المخصص — رجعت لوحة الأزرار الافتراضية عند كتابة "اوامر".').catch(() => {});
+  await dbRun('DELETE FROM global_help_file WHERE id=1', []).catch(() => {});
+  ctx.reply('🗑 تم حذف الملف العام — رجعت لوحة الأزرار الافتراضية بكل القروبات.').catch(() => {});
 }
 
 function setupHelpPdfCommands(bot) {
@@ -63,4 +56,4 @@ function setupHelpPdfCommands(bot) {
   bot.hears(/^حذف (ملف )?الاوامر$/i, clearHandler);
 }
 
-module.exports = { setupHelpPdfCommands, getHelpFileId };
+module.exports = { setupHelpPdfCommands, getGlobalHelpFileId };
