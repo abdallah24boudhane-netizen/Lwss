@@ -478,6 +478,17 @@ async function showHelpHome(ctx) {
   // ✅ فالخاص: قائمة خاصة بالمستخدم العادي (بحث/ألعاب/بنك/AI)
   if (ctx.chat?.type === 'private') return showPrivateHelpHome(ctx);
   const isCallback = !!ctx.callbackQuery;
+
+  // ✅ إذا الأدمن عيّن ملف مخصص (تعيين الاوامر)، نرسله مباشرة بدل لوحة الأزرار
+  // (بس عند الكتابة المباشرة، مو أثناء التنقل بالأزرار داخل اللوحة نفسها)
+  if (!isCallback && ['group', 'supergroup'].includes(ctx.chat?.type)) {
+    const fileId = await require('./group_help_pdf').getHelpFileId(ctx.chat.id).catch(() => null);
+    if (fileId) {
+      setTimeout(() => ctx.deleteMessage().catch(() => {}), 1000);
+      return ctx.replyWithDocument(fileId).catch(() => {});
+    }
+  }
+
   const txt = '🤖 *مركز المساعدة*\n━━━━━━━━━━━━━━━━\nاختر القسم:';
   if (isCallback) {
     await ctx.editMessageText(txt, { parse_mode: 'Markdown', reply_markup: buildHelpHomeKb() }).catch(() => {});

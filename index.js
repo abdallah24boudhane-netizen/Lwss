@@ -510,6 +510,8 @@ setupGroupCommands(bot);
 const { setupTopicCommands, trackTopicMiddleware, ensureTopicsTable } = require('./handlers/group_topics');
 ensureTopicsTable().catch(() => {});
 trackTopicMiddleware(bot);
+const { setupHelpPdfCommands } = require('./handlers/group_help_pdf');
+setupHelpPdfCommands(bot);
 setupTopicCommands(bot);
 
 require('./handlers/group_commands_pro').setupProCommands(bot);
