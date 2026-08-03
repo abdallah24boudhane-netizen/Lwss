@@ -4,7 +4,7 @@ const { cacheGet, cacheSet, cacheClear, cacheGetAsync, cacheSetAsync } = require
 const guard        = require('../utils/channelGuard');
 const startHandler = require('../handlers/start');
 const { getSetting, get: dbGet } = require('../database/db');
-const { get, run, getP } = require('../database/db');
+const { get, run } = require('../database/db');
 
 // ✅ OWNER_ID إجباري من .env — لا fallback hardcoded
 const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
@@ -91,7 +91,7 @@ async function authMiddleware(ctx, next) {
   const banCached = await cacheGetAsync('ban_' + uid);
   const [info, banRow] = await Promise.all([
     getAdminInfo(uid),
-    banCached === null ? getP('getBan', [uid]) : Promise.resolve(null),
+    banCached === null ? get('SELECT * FROM user_bans WHERE user_id=$1 AND (expires_at IS NULL OR expires_at > NOW()) LIMIT 1', [uid]).catch(()=>null) : Promise.resolve(null),
   ]);
   ctx.isAdmin    = info.isAdmin;
   ctx.adminPerms = info.perms;
