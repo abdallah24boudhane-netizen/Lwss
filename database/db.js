@@ -14,7 +14,7 @@ function getPg() {
     pgPool = new Pool({
       connectionString:            process.env.DATABASE_URL,
       ssl: process.env.DATABASE_URL?.includes('localhost') ? false : { rejectUnauthorized: false },
-      max:                         15,   // 15 اتصال متزامن
+      max:                         25,   // 25 اتصال متزامن (كافٍ ضمن سقف Railway الافتراضي 100 اتصال)
       min:                         2,    // دائماً connection جاهزة
       idleTimeoutMillis:           20000,
       connectionTimeoutMillis:     3000,
@@ -39,7 +39,7 @@ function getPg() {
     }, 25000);
     _kpTimer.unref();
 
-    logger.info('✅ PG Pool جاهز (max:15)');
+    logger.info('✅ PG Pool جاهز (max:25)');
     return pgPool;
   } catch(e) {
     logger.error('[DB] pool init error: ' + e.message);
