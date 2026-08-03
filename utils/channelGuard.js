@@ -17,7 +17,10 @@ async function _checkOne(bot, userId, channelId) {
         msg.includes('CHANNEL_PRIVATE')     ||
         msg.includes('chat not found')      ||
         msg.includes('Invalid peer')        ||
-        msg.includes('not enough rights')) {
+        msg.includes('not enough rights')   ||
+        msg.includes('_ADMIN_REQUIRED')     ||
+        msg.includes('USER_NOT_PARTICIPANT') ||
+        msg.includes('PARTICIPANT_ID_INVALID')) {
       console.warn('[ChannelGuard] skip check (bot not admin):', channelId);
       return true;
     }
