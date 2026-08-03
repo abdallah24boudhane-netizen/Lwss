@@ -545,30 +545,7 @@ async function _flushDlBatch() {
 setInterval(_flushDlBatch, 30000).unref(); // flush كل 30 ثانية
 
 
-// ── Prepared Statements — تُعدَّل مرة واحدة لكل connection ──────
-const PREPARED = {
-  getFile:    { name: 'get_file',     text: 'SELECT * FROM files WHERE id=$1 AND is_deleted=0' },
-  getUser:    { name: 'get_user',     text: 'SELECT * FROM users WHERE id=$1' },
-  addHistory: { name: 'add_hist',     text: 'INSERT INTO history(user_id,file_id,viewed_at) VALUES($1,$2,NOW()) ON CONFLICT DO NOTHING' },
-  getCats:    { name: 'get_cats',     text: 'SELECT * FROM categories WHERE subject_id=$1 AND is_deleted=0 ORDER BY name ASC' },
-  getFav:     { name: 'get_fav',      text: 'SELECT 1 FROM favorites WHERE user_id=$1 AND file_id=$2' },
-  getAdm:     { name: 'get_adm',      text: 'SELECT permissions FROM admins WHERE user_id=$1' },
-  getBan:     { name: 'get_ban',      text: 'SELECT is_banned FROM users WHERE id=$1' },
-};
-
-async function queryP(name, values) {
-  const pg = await getPg();
-  if (!pg) return null;
-  const stmt = PREPARED[name];
-  if (!stmt) throw new Error('Unknown prepared statement: ' + name);
-  const r = await pg.query({ name: stmt.name, text: stmt.text, values });
-  return r.rows;
-}
-
-async function getP(name, values) {
-  const rows = await queryP(name, values);
-  return rows?.[0] || null;
-}
+// ✅ Named Prepared Statements (PREPARED/queryP/getP) حُذفت — كانت ميتة (غير مستخدمة) وخطرة مع PgBouncer Transaction Mode
 
 
 // ══════════════════════════════════════════
