@@ -632,7 +632,7 @@ async function migrateGroupPro() {
 }
 
 module.exports = {
-  migrateGroupPro, batchDownload, queryP, getP, get, all, run, transaction, getPg, initSchema, getSetting, setSetting, saveDB };
+  migrateGroupPro, batchDownload, get, all, run, transaction, getPg, initSchema, getSetting, setSetting, saveDB };
 // هذا السطر ما يضاف هنا — شغّل الكومند التالي مباشرة على DB
 
 // ── Migration: جداول البنك ──
