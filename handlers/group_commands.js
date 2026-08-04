@@ -1020,27 +1020,45 @@ async function handleSettingsCallback(ctx, data) {
 
 async function showGamesMenu(ctx) {
   const customGames = await require('../database/db').all(
-    'SELECT name, keyword, description FROM custom_games WHERE is_active=1 ORDER BY id'
+    'SELECT name, keyword FROM custom_games WHERE is_active=1 ORDER BY id'
   ).catch(() => []);
 
-  if (!customGames.length) {
-    return ctx.reply('🎮 *العاب تالين*\n\nمافيش ألعاب مضافة حالياً.', {
-      parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id,
-    }).catch(() => null);
+  let customBlock = '';
+  if (customGames.length) {
+    const rows2 = [];
+    for (let i = 0; i < customGames.length; i += 2) {
+      const left  = '❦︎ ' + customGames[i].keyword;
+      const right = customGames[i + 1] ? '❦︎ ' + customGames[i + 1].keyword : '';
+      rows2.push(left.padEnd(28, ' ') + right);
+    }
+    customBlock =
+      '\n\n🎖 *العاب تالين (اكتب الكلمة مباشرة):*\n' +
+      '⏞'.repeat(18) + '\n' +
+      '```\n' + rows2.join('\n') + '\n```\n' +
+      '⏟'.repeat(18);
   }
 
-  const lines = customGames.map(g =>
-    '🔸 *' + g.keyword + '*' + (g.description ? ' — ' + g.description : '')
-  );
+  const mainText =
+    '🎮 *ألعاب القروب*\n' +
+    '━━━━━━━━━━━━━━━━━━━━\n\n' +
+    '🏆 *من سيربح المليون*\n' +
+    '📸 *خمّن الصورة*\n' +
+    '🐺 *لوب غارو*\n' +
+    '🎲 *صحصح*' +
+    customBlock + '\n\n' +
+    '👇 اختر لعبة لمعرفة التفاصيل، أو اكتب الكلمة مباشرة:';
 
-  const text =
-    '🎮 *العاب تالين*\n\n' +
-    lines.join('\n\n') +
-    '\n\n👇 اكتب الكلمة المفتاحية مباشرة للعب';
+  const mainKb = [
+    [{ text: '🏆 من سيربح المليون', callback_data: 'grp_game_info_million' }],
+    [{ text: '📸 خمّن الصورة',      callback_data: 'grp_game_info_guess'   }],
+    [{ text: '🐺 لوب غارو',         callback_data: 'grp_game_info_werewolf' }],
+    [{ text: '🎲 صحصح',             callback_data: 'grp_game_info_tod'      }],
+  ];
 
-  return ctx.reply(text, {
+  return ctx.reply(mainText, {
     parse_mode: 'Markdown',
     reply_to_message_id: ctx.message?.message_id,
+    reply_markup: { inline_keyboard: mainKb },
   }).catch(() => null);
 }
 
