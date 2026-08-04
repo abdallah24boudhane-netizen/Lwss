@@ -1091,22 +1091,15 @@ async function showGamesMenu(ctx) {
       '⏟'.repeat(18);
   }
 
+  const footer = customGames.length
+    ? '\n\n👇 اكتب الكلمة المفتاحية مباشرة للعب'
+    : '';
   const text =
-    '🎮 *ألعاب القروب*\n\n' +
-    '🏆 مليون\n' +
-    '📸 خمن\n' +
-    '🐺 لوب غارو\n' +
-    '🎲 صحصح' +
-    customBlock + '\n\n' +
-    '👇 اضغط على لعبة لمعرفة طريقة اللعب';
-  const rows = [
-    [{ text: '🏆 مليون', callback_data: 'games_how_million' }, { text: '🐺 لوب غارو', callback_data: 'games_how_werewolf' }],
-    [{ text: '🎲 اكسيو فيريتي', callback_data: 'games_how_tod' }, { text: '📸 خمن', callback_data: 'games_how_guess' }],
-  ];
+    '🎮 *العاب تالين*' +
+    customBlock + footer;
   return ctx.reply(text, {
     parse_mode: 'Markdown',
     reply_to_message_id: ctx.message?.message_id,
-    reply_markup: { inline_keyboard: rows }
   }).catch(() => null);
 }
 
