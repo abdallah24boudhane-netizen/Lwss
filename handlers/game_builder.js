@@ -96,11 +96,14 @@ async function checkGameTrigger(ctx) {
   if (!['group', 'supergroup'].includes(ctx.chat?.type)) return false;
   const text = ctx.message?.text;
   if (!text) return false;
-  if (_sessions.has(ctx.chat.id)) return false;
 
   const map = await getKeywordsMap();
   const game = map.get(normAnswer(text));
   if (!game) return false;
+
+  const existing = _sessions.get(ctx.chat.id);
+  if (existing && existing.gameId !== game.id) return false;
+  await endSession(ctx.chat.id);
 
   const q = await pickQuestion(game.id);
   if (!q) return ctx.reply('⚠️ لعبة "' + game.name + '" ما فيهاش أسئلة مفعّلة حالياً.').catch(() => {});
