@@ -1029,30 +1029,23 @@ async function showGamesMenu(ctx) {
     for (let i = 0; i < customGames.length; i += 2) {
       const left  = '❦︎ ' + customGames[i].keyword;
       const right = customGames[i + 1] ? '❦︎ ' + customGames[i + 1].keyword : '';
-      rows2.push(left.padEnd(28, ' ') + right);
+      rows2.push(left.padEnd(22, '\u2003') + right);
     }
-    customBlock =
-      '\n\n🎖 *العاب تالين (اكتب الكلمة مباشرة):*\n' +
-      '⏞'.repeat(18) + '\n' +
-      '```\n' + rows2.join('\n') + '\n```\n' +
-      '⏟'.repeat(18);
+    // ✅ بدون code-block (```) — نص عادي بلا خط Monospace وبلا زر Copy Code
+    customBlock = '\n\n🎖 *العاب تالين (اكتب الكلمة مباشرة):*\n' + rows2.join('\n');
   }
 
   const mainText =
     '🎮 *ألعاب القروب*\n' +
-    '━━━━━━━━━━━━━━━━━━━━\n\n' +
-    '🏆 *من سيربح المليون*\n' +
-    '📸 *خمّن الصورة*\n' +
-    '🐺 *لوب غارو*\n' +
-    '🎲 *صحصح*' +
+    '━━━━━━━━━━━━━━━━━━━━' +
     customBlock + '\n\n' +
     '👇 اختر لعبة لمعرفة التفاصيل، أو اكتب الكلمة مباشرة:';
 
   const mainKb = [
-    [{ text: '🏆 من سيربح المليون', callback_data: 'grp_game_info_million' }],
-    [{ text: '📸 خمّن الصورة',      callback_data: 'grp_game_info_guess'   }],
-    [{ text: '🐺 لوب غارو',         callback_data: 'grp_game_info_werewolf' }],
-    [{ text: '🎲 صحصح',             callback_data: 'grp_game_info_tod'      }],
+    [{ text: '🏆 من سيربح المليون', callback_data: 'grp_game_info_million' },
+     { text: '📸 خمّن الصورة',      callback_data: 'grp_game_info_guess'   }],
+    [{ text: '🐺 لوب غارو',         callback_data: 'grp_game_info_werewolf' },
+     { text: '🎲 صحصح',             callback_data: 'grp_game_info_tod'      }],
   ];
 
   return ctx.reply(mainText, {
