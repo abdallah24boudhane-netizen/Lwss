@@ -23,6 +23,7 @@ async function showGamesPanel(ctx) {
     [kbBtn('🎲 إدارة لعبة صحصح',    'gp_tod_panel')],
     [kbBtn('🎰 إعدادات السلوت',      'gp_slot_panel')],
     [kbBtn('🏪 إدارة المتجر',        'gp_shop_panel')],
+    [kbBtn('🧩 منشئ الألعاب (ألعاب مخصّصة)', 'cg_home')],
     [kbBtn('◀️ رجوع', 'gp_panel')],
   ];
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
