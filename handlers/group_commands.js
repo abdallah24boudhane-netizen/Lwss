@@ -381,6 +381,29 @@ function setupGroupCommands(bot) {
     const qc = await dbG('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c:0 }));
     const qs = parseInt(qc?.c || 0);
 
+    // ✅ قائمة الألعاب المخصّصة (منشئ الألعاب) — تتحدث تلقائياً مع كل لعبة جديدة
+    const customGames = await require('../database/db').all(
+      'SELECT name, keyword FROM custom_games WHERE is_active=1 ORDER BY id'
+    ).catch(() => []);
+
+    let customBlock = '';
+    if (customGames.length) {
+      const half = Math.ceil(customGames.length / 2);
+      const col1 = customGames.slice(0, half);
+      const col2 = customGames.slice(half);
+      const rows = [];
+      for (let i = 0; i < col1.length; i++) {
+        const left  = '• ' + col1[i].keyword;
+        const right = col2[i] ? '• ' + col2[i].keyword : '';
+        rows.push(left.padEnd(28, ' ') + right);
+      }
+      customBlock =
+        '\n\n🎖 *ألعاب إضافية (اكتب الكلمة مباشرة):*\n' +
+        '⏞'.repeat(18) + '\n' +
+        '```\n' + rows.join('\n') + '\n```\n' +
+        '⏟'.repeat(18);
+    }
+
     const mainText =
       '🎮 *ألعاب القروب*\n' +
       '━━━━━━━━━━━━━━━━━━━━\n\n' +
@@ -388,7 +411,8 @@ function setupGroupCommands(bot) {
       '📸 *خمّن الصورة*\n' +
       '🎲 *قلب العملة*\n' +
       '🦹 *السرقة*\n' +
-      '🏦 *البنك والمكافآت*\n\n' +
+      '🏦 *البنك والمكافآت*' +
+      customBlock + '\n\n' +
       '👇 اختر لعبة لمعرفة التفاصيل:';
 
     const mainKb = [
