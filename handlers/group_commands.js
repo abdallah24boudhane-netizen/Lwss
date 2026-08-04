@@ -1069,12 +1069,35 @@ async function handleSettingsCallback(ctx, data) {
 
 
 async function showGamesMenu(ctx) {
+  const customGames = await require('../database/db').all(
+    'SELECT name, keyword FROM custom_games WHERE is_active=1 ORDER BY id'
+  ).catch(() => []);
+
+  let customBlock = '';
+  if (customGames.length) {
+    const half = Math.ceil(customGames.length / 2);
+    const col1 = customGames.slice(0, half);
+    const col2 = customGames.slice(half);
+    const rows2 = [];
+    for (let i = 0; i < col1.length; i++) {
+      const left  = '• ' + col1[i].keyword;
+      const right = col2[i] ? '• ' + col2[i].keyword : '';
+      rows2.push(left.padEnd(28, ' ') + right);
+    }
+    customBlock =
+      '\n\n🎖 *ألعاب إضافية (اكتب الكلمة مباشرة):*\n' +
+      '⏞'.repeat(18) + '\n' +
+      '```\n' + rows2.join('\n') + '\n```\n' +
+      '⏟'.repeat(18);
+  }
+
   const text =
     '🎮 *ألعاب القروب*\n\n' +
     '🏆 مليون\n' +
     '📸 خمن\n' +
     '🐺 لوب غارو\n' +
-    '🎲 صحصح\n\n' +
+    '🎲 صحصح' +
+    customBlock + '\n\n' +
     '👇 اضغط على لعبة لمعرفة طريقة اللعب';
   const rows = [
     [{ text: '🏆 مليون', callback_data: 'games_how_million' }, { text: '🐺 لوب غارو', callback_data: 'games_how_werewolf' }],
