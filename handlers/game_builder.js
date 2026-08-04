@@ -57,36 +57,35 @@ async function checkGameTrigger(ctx) {
   const timeLimit = Math.max(10, Math.min(q.time_limit || 60, 600));
 
   try {
-    const opts = q.question_text ? { caption: q.question_text } : {};
+    const opts = { reply_to_message_id: ctx.message.message_id, ...(q.question_text ? { caption: q.question_text } : {}) };
     switch (q.content_type) {
       case 'photo':    await ctx.replyWithPhoto(q.file_id, opts); break;
       case 'video':    await ctx.replyWithVideo(q.file_id, opts); break;
       case 'animation':await ctx.replyWithAnimation(q.file_id, opts); break;
       case 'audio':    await ctx.replyWithAudio(q.file_id, opts); break;
-      case 'voice':    await ctx.replyWithVoice(q.file_id); if (q.question_text) await ctx.reply(q.question_text); break;
+      case 'voice':    await ctx.replyWithVoice(q.file_id, { reply_to_message_id: ctx.message.message_id }); break;
       case 'document': await ctx.replyWithDocument(q.file_id, opts); break;
-      case 'sticker':  await ctx.replyWithSticker(q.file_id); if (q.question_text) await ctx.reply(q.question_text); break;
+      case 'sticker':  await ctx.replyWithSticker(q.file_id, { reply_to_message_id: ctx.message.message_id }); break;
       default:
-        await ctx.reply((q.content_text || '') + (q.question_text ? '\n\n❓ ' + q.question_text : ''));
+        await ctx.reply(q.content_text || (q.question_text || ''), { reply_to_message_id: ctx.message.message_id });
     }
   } catch (e) {
     logger.error('[game_builder] send content failed: ' + e.message);
     return ctx.reply('❌ خطأ فـ إرسال محتوى السؤال.').catch(() => {});
   }
 
-  const timer = setTimeout(async () => {
+  const startTime = Date.now();
+  const timer = setTimeout(() => {
     const s = _sessions.get(ctx.chat.id);
     if (!s || s.questionId !== q.id) return;
-    _sessions.delete(ctx.chat.id);
-    await ctx.reply('⏰ *انتهى الوقت!* محدش جاوب صح.\n✅ الإجابة: ' + answers[0], { parse_mode: 'Markdown' }).catch(() => {});
+    _sessions.delete(ctx.chat.id); // ✅ صامت — بلا رسالة، نفس مبدأ لعبة "دول"
   }, timeLimit * 1000);
 
   _sessions.set(ctx.chat.id, {
     gameId: game.id, questionId: q.id, answers: answers.map(normAnswer),
-    reward: q.reward || 0, timer, name: game.name,
+    reward: q.reward || 0, timer, name: game.name, startTime,
   });
-
-  return ctx.reply('⏱ عندك *' + timeLimit + '* ثانية للإجابة!', { parse_mode: 'Markdown' }).catch(() => {});
+  // ✅ بلا رسالة إضافية بعد المحتوى — نفس مبدأ لعبة "دول"
 }
 
 async function checkGameAnswer(ctx) {
@@ -102,26 +101,33 @@ async function checkGameAnswer(ctx) {
   await endSession(ctx.chat.id);
 
   const uid = ctx.from.id;
-  const name = ctx.from.first_name || 'اللاعب';
+  const name = ctx.from.first_name || 'لاعب';
+  const elapsed = ((Date.now() - sess.startTime) / 1000).toFixed(2);
+  const mention = `[${name}](tg://user?id=${uid})`;
 
+  let newBal = 0;
   if (sess.reward > 0) {
     try {
+      const cur = await get('SELECT balance FROM pro_bank_accounts WHERE user_id=$1', [uid]).catch(() => null);
+      const curBal = cur ? parseFloat(cur.balance || 0) : 0;
+      newBal = curBal + sess.reward;
       await run(
-        'INSERT INTO bank_accounts(user_id, username, first_name, balance) VALUES($1,$2,$3,$4) ON CONFLICT (user_id) DO UPDATE SET balance = bank_accounts.balance + $4',
-        [uid, ctx.from.username || '', name, sess.reward]
+        `INSERT INTO pro_bank_accounts(user_id, balance) VALUES($1,$2)
+         ON CONFLICT(user_id) DO UPDATE SET balance = pro_bank_accounts.balance + $2`,
+        [uid, sess.reward]
       );
-      await run(
-        "INSERT INTO bank_transactions(from_id,to_id,amount,type,note) VALUES(0,$1,$2,'custom_game',$3)",
-        [uid, sess.reward, 'لعبة: ' + sess.name]
-      ).catch(() => {});
     } catch (e) {
       logger.error('[game_builder] reward failed: ' + e.message);
     }
   }
 
   return ctx.reply(
-    '🎉 *إجابة صحيحة!*\n👤 ' + name + (sess.reward > 0 ? '\n💰 ربح: +' + sess.reward + '$' : ''),
-    { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id }
+    `• اجابة صحيحة ← ${mention}\n` +
+    `• اللعبة ← ${sess.name}\n` +
+    `• عدد الثواني ← ${elapsed}\n` +
+    (sess.reward > 0 ? `• فلوسك ← (${Math.floor(newBal).toLocaleString()} DA 🤑)\n` : '') +
+    `-`,
+    { reply_to_message_id: ctx.message.message_id, parse_mode: 'Markdown' }
   ).catch(() => {});
 }
 
