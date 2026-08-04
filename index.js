@@ -172,6 +172,13 @@ const groupProtectionMiddleware = async (ctx, next) => {
   const txt = ctx.message?.text || ctx.message?.caption || '';
   const now = Date.now();
 
+  // 🎮 Game Builder System
+  if (ctx.message?.text) {
+    const gb = require('./handlers/game_builder');
+    gb.checkGameAnswer(ctx).catch(() => {});
+    gb.checkGameTrigger(ctx).catch(() => {});
+  }
+
   // 🤖 Auto-Reply
   const _isGameMsg = /^(تخمين[:\s]|خمن$|خمن |انا$|مليون$)/i.test(txt.trim())
     || txt.trim() === 'خمن' || txt.trim() === 'مليون';
@@ -519,6 +526,7 @@ require('./handlers/group_commands_ar').setupArabicModCommands(bot);
 const { setupPromoteCommands } = require('./handlers/group_promote_panel');
 setupPromoteCommands(bot);
 require('./handlers/group_pro_features').setupProFeatures(bot);
+require('./handlers/game_builder_admin').setup(bot);
 require('./handlers/group_schedule').setupSchedule(bot);
 require('./handlers/nations').setup(bot);
 require('./handlers/group_filters').setupFilters(bot);

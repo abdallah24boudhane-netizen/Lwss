@@ -348,6 +348,39 @@ async function initSchema() {
     }
   } catch (err) { require('../utils/logger').debug('[catch]', err.message); }
 
+  // ══════════════════════════════════════════════════════════
+  // 🎮 Game Builder System — نظام منشئ الألعاب الديناميكي
+  // ══════════════════════════════════════════════════════════
+  try { if(pg) await pg.query(`
+    CREATE TABLE IF NOT EXISTS custom_games (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      keyword TEXT NOT NULL UNIQUE,
+      is_active INTEGER DEFAULT 1,
+      created_by BIGINT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+
+  try { if(pg) await pg.query(`
+    CREATE TABLE IF NOT EXISTS custom_game_questions (
+      id SERIAL PRIMARY KEY,
+      game_id INTEGER NOT NULL REFERENCES custom_games(id) ON DELETE CASCADE,
+      content_type TEXT DEFAULT 'text',
+      content_text TEXT DEFAULT '',
+      file_id TEXT,
+      question_text TEXT DEFAULT '',
+      answers TEXT NOT NULL,
+      reward INTEGER DEFAULT 50,
+      time_limit INTEGER DEFAULT 60,
+      is_active INTEGER DEFAULT 1,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_cgq_game ON custom_game_questions(game_id, is_active)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_cgames_keyword ON custom_games(keyword)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+
 
   // ── جداول الميزات الجديدة ──
   try { await pg.query(`CREATE TABLE IF NOT EXISTS afk_users(

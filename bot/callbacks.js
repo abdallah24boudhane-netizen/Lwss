@@ -238,6 +238,7 @@ module.exports.registerCallbacks = function(bot, deps) {
     // Group
     { p: 'grp_main_',   fn: (ctx, d) => { const chatId = d.replace('grp_main_',''); return require('../handlers/group_members_panel').showMembersHub(ctx, chatId); } },
     { p: 'gm_',         fn: (ctx, d) => require('../handlers/group_members_panel').handleCallback(ctx, d) },
+    { p: 'cg_',         fn: (ctx, d) => require('../handlers/game_builder_admin').handleCallback(ctx, d) },
     { p: 'grp_main',    fn: (ctx, d) => { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? groupPanel.showMainMenu(ctx) : groupPanel.showMyGroups(ctx); } },
     { p: 'gp_jreq_',    fn: (ctx, d) => require('../handlers/group_join_requests').handleCallback(ctx, d) },
     { p: 'gp_topicdel_', fn: (ctx, d) => require('../handlers/group_topics').handleCallback(ctx, d) },

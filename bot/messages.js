@@ -282,6 +282,7 @@ module.exports.registerMessages = function(bot, deps) {
       return;
     }
 
+    if (s?.type === 'cg_q_content') return require('../handlers/game_builder_admin').handleText(ctx, ctx.message.caption || '', s);
     if (s?.type === 'mg_file') return manage.handleFileUpload(ctx);
   });
 
@@ -332,6 +333,7 @@ module.exports.registerMessages = function(bot, deps) {
     if (s?.type === 'mg_bulk_files')   return manage.handleBulkUpload(ctx);
     if (s?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
     if (s?.type === 'mg_file')         return manage.handleFileUpload(ctx);
+    if (s?.type === 'cg_q_content')     return require('../handlers/game_builder_admin').handleText(ctx, ctx.message.caption || '', s);
 
     // ── رد تلقائي بوسائط (صورة/فيديو/ستيكر/صوت) ──
     if (s?.type === 'mg_ar_response' && ctx.chat?.type === 'private') {
@@ -548,6 +550,7 @@ module.exports.registerMessages = function(bot, deps) {
       if ((s?.type || '').startsWith('mg_') && (ctx.isAdmin || ctx.isOwner)) return manage.handleText(ctx, s);
       if ((s?.type || '').startsWith('gp_')) return groupPanel.handleText(ctx, txt, s);
       if ((s?.type || '').startsWith('gm_')) return require('../handlers/group_members_panel').handleText(ctx, txt, s);
+      if ((s?.type || '').startsWith('cg_')) return require('../handlers/game_builder_admin').handleText(ctx, txt, s);
       if ((s?.type || '').startsWith('gpx_')) {
         const handled = await require('../handlers/group_pro_panel').handleText(ctx, txt, s).catch(() => false);
         if (handled !== false) return;
@@ -656,6 +659,7 @@ module.exports.registerMessages = function(bot, deps) {
     }
     if (ctx.chat?.type !== 'private') return;
     const s = require('../utils/stateManager').getState(ctx.uid);
+    if (s?.type === 'cg_q_content') return require('../handlers/game_builder_admin').handleText(ctx, '', s);
     // إذا كان في وضع إضافة رد تلقائي — احفظ الستيكر
     if (s?.type === 'mg_ar_response' && ctx.chat?.type === 'private') {
       const { setState } = require('../utils/stateManager');
