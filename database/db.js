@@ -361,6 +361,7 @@ async function initSchema() {
       created_at TIMESTAMP DEFAULT NOW()
     )
   `); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query("ALTER TABLE custom_games ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''"); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
   try { if(pg) await pg.query(`
     CREATE TABLE IF NOT EXISTS custom_game_questions (

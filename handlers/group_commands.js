@@ -377,57 +377,7 @@ function setupGroupCommands(bot) {
   bot.command(["العاب", "games", "العبوا", "الالعاب"], async ctx => {
     if (!isGroup(ctx)) return;
     delCmd(ctx);
-    const { get: dbG } = require('../database/db');
-    const qc = await dbG('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c:0 }));
-    const qs = parseInt(qc?.c || 0);
-
-    // ✅ قائمة الألعاب المخصّصة (منشئ الألعاب) — تتحدث تلقائياً مع كل لعبة جديدة
-    const customGames = await require('../database/db').all(
-      'SELECT name, keyword FROM custom_games WHERE is_active=1 ORDER BY id'
-    ).catch(() => []);
-
-    let customBlock = '';
-    if (customGames.length) {
-      const half = Math.ceil(customGames.length / 2);
-      const col1 = customGames.slice(0, half);
-      const col2 = customGames.slice(half);
-      const rows = [];
-      for (let i = 0; i < col1.length; i++) {
-        const left  = '• ' + col1[i].keyword;
-        const right = col2[i] ? '• ' + col2[i].keyword : '';
-        rows.push(left.padEnd(28, ' ') + right);
-      }
-      customBlock =
-        '\n\n🎖 *ألعاب إضافية (اكتب الكلمة مباشرة):*\n' +
-        '⏞'.repeat(18) + '\n' +
-        '```\n' + rows.join('\n') + '\n```\n' +
-        '⏟'.repeat(18);
-    }
-
-    const mainText =
-      '🎮 *ألعاب القروب*\n' +
-      '━━━━━━━━━━━━━━━━━━━━\n\n' +
-      '🏆 *من سيربح المليون*\n' +
-      '📸 *خمّن الصورة*\n' +
-      '🎲 *قلب العملة*\n' +
-      '🦹 *السرقة*\n' +
-      '🏦 *البنك والمكافآت*' +
-      customBlock + '\n\n' +
-      '👇 اختر لعبة لمعرفة التفاصيل:';
-
-    const mainKb = [
-      [{ text: '🏆 من سيربح المليون', callback_data: 'grp_game_info_million' }],
-      [{ text: '📸 خمّن الصورة',      callback_data: 'grp_game_info_guess'   }],
-      [{ text: '🎲 قلب العملة',       callback_data: 'grp_game_info_flip'    }],
-      [{ text: '🦹 السرقة',           callback_data: 'grp_game_info_rob'     }],
-      [{ text: '🏦 البنك',            callback_data: 'grp_game_info_bank'    }],
-    ];
-
-    const msg = await ctx.reply(mainText, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: mainKb }
-    }).catch(() => null);
-    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {}), 180000);
+    return showGamesMenu(ctx);
   });
 
 
@@ -1070,33 +1020,24 @@ async function handleSettingsCallback(ctx, data) {
 
 async function showGamesMenu(ctx) {
   const customGames = await require('../database/db').all(
-    'SELECT name, keyword FROM custom_games WHERE is_active=1 ORDER BY id'
+    'SELECT name, keyword, description FROM custom_games WHERE is_active=1 ORDER BY id'
   ).catch(() => []);
 
-  let customBlock = '';
-  if (customGames.length) {
-    const half = Math.ceil(customGames.length / 2);
-    const col1 = customGames.slice(0, half);
-    const col2 = customGames.slice(half);
-    const rows2 = [];
-    for (let i = 0; i < col1.length; i++) {
-      const left  = '• ' + col1[i].keyword;
-      const right = col2[i] ? '• ' + col2[i].keyword : '';
-      rows2.push(left.padEnd(28, ' ') + right);
-    }
-    customBlock =
-      '\n\n🎖 *ألعاب إضافية (اكتب الكلمة مباشرة):*\n' +
-      '⏞'.repeat(18) + '\n' +
-      '```\n' + rows2.join('\n') + '\n```\n' +
-      '⏟'.repeat(18);
+  if (!customGames.length) {
+    return ctx.reply('🎮 *العاب تالين*\n\nمافيش ألعاب مضافة حالياً.', {
+      parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id,
+    }).catch(() => null);
   }
 
-  const footer = customGames.length
-    ? '\n\n👇 اكتب الكلمة المفتاحية مباشرة للعب'
-    : '';
+  const lines = customGames.map(g =>
+    '🔸 *' + g.keyword + '*' + (g.description ? ' — ' + g.description : '')
+  );
+
   const text =
-    '🎮 *العاب تالين*' +
-    customBlock + footer;
+    '🎮 *العاب تالين*\n\n' +
+    lines.join('\n\n') +
+    '\n\n👇 اكتب الكلمة المفتاحية مباشرة للعب';
+
   return ctx.reply(text, {
     parse_mode: 'Markdown',
     reply_to_message_id: ctx.message?.message_id,

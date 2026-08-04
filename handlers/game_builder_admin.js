@@ -34,9 +34,14 @@ async function handleText(ctx, txt, state) {
   }
 
   if (state.type === 'cg_new_keyword') {
-    const keyword = txt.trim();
+    await setState(ctx.uid, { type: 'cg_new_desc', name: state.name, keyword: txt.trim() });
+    return ctx.reply('📝 وصف مختصر للعبة (يبان جنب الكلمة المفتاحية فقائمة الألعاب):\n_(أو /skip)_', { parse_mode: 'Markdown' }).catch(() => {});
+  }
+
+  if (state.type === 'cg_new_desc') {
+    const description = txt === '/skip' ? '' : txt.trim();
     try {
-      const row = await get('INSERT INTO custom_games(name, keyword, created_by) VALUES($1,$2,$3) RETURNING id', [state.name, keyword, ctx.uid]);
+      const row = await get('INSERT INTO custom_games(name, keyword, description, created_by) VALUES($1,$2,$3,$4) RETURNING id', [state.name, state.keyword, description, ctx.uid]);
       invalidateKeywordsCache();
       await delState(ctx.uid);
       await ctx.reply('✅ اللعبة "' + state.name + '" اتخلقت! (رقمها #' + row.id + ')\n\nدروك زيدلها سؤال:', {
