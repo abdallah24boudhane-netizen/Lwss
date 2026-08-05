@@ -17,8 +17,13 @@ function normAnswer(t) {
 async function getKeywordsMap() {
   const cached = cacheGet(KEYWORDS_CACHE_KEY);
   if (cached) return cached;
-  const rows = await all('SELECT id, name, keyword FROM custom_games WHERE is_active=1').catch(() => []);
-  const map = new Map(rows.map(r => [normAnswer(r.keyword), r]));
+  const rows = await all('SELECT id, name, keyword, has_answer, show_answer, answer_display_seconds FROM custom_games WHERE is_active=1').catch(() => []);
+  const map = new Map(rows.map(r => [normAnswer(r.keyword), {
+    ...r,
+    has_answer: Number(r.has_answer) || 0,
+    show_answer: Number(r.show_answer) || 0,
+    answer_display_seconds: Number(r.answer_display_seconds) || 0,
+  }]));
   cacheSet(KEYWORDS_CACHE_KEY, map, KEYWORDS_TTL);
   return map;
 }
@@ -50,7 +55,31 @@ async function pickQuestion(gameId) {
   return q;
 }
 
+async function sendContent(ctx, q, replyToId) {
+  const opts = { reply_to_message_id: replyToId, ...(q.question_text ? { caption: q.question_text } : {}) };
+  switch (q.content_type) {
+    case 'photo':    return ctx.replyWithPhoto(q.file_id, opts);
+    case 'video':    return ctx.replyWithVideo(q.file_id, opts);
+    case 'animation':return ctx.replyWithAnimation(q.file_id, opts);
+    case 'audio':    return ctx.replyWithAudio(q.file_id, opts);
+    case 'voice':    return ctx.replyWithVoice(q.file_id, { reply_to_message_id: replyToId });
+    case 'document': return ctx.replyWithDocument(q.file_id, opts);
+    case 'sticker':  return ctx.replyWithSticker(q.file_id, { reply_to_message_id: replyToId });
+    default:
+      return ctx.reply(q.content_text || (q.question_text || ''), { reply_to_message_id: replyToId });
+  }
+}
+
 async function sendQuestion(ctx, game, q, replyToId) {
+  if (!game.has_answer) {
+    try { await sendContent(ctx, q, replyToId); }
+    catch (e) {
+      logger.error('[game_builder] send content failed: ' + e.message);
+      await ctx.reply('❌ خطأ فـ إرسال محتوى اللعبة.').catch(() => {});
+    }
+    return true;
+  }
+
   let answers;
   try { answers = JSON.parse(q.answers); } catch { answers = [q.answers]; }
   if (!Array.isArray(answers) || !answers.length) {
@@ -59,35 +88,30 @@ async function sendQuestion(ctx, game, q, replyToId) {
   }
   const timeLimit = Math.max(10, Math.min(q.time_limit || 60, 600));
 
-  try {
-    const opts = { reply_to_message_id: replyToId, ...(q.question_text ? { caption: q.question_text } : {}) };
-    switch (q.content_type) {
-      case 'photo':    await ctx.replyWithPhoto(q.file_id, opts); break;
-      case 'video':    await ctx.replyWithVideo(q.file_id, opts); break;
-      case 'animation':await ctx.replyWithAnimation(q.file_id, opts); break;
-      case 'audio':    await ctx.replyWithAudio(q.file_id, opts); break;
-      case 'voice':    await ctx.replyWithVoice(q.file_id, { reply_to_message_id: replyToId }); break;
-      case 'document': await ctx.replyWithDocument(q.file_id, opts); break;
-      case 'sticker':  await ctx.replyWithSticker(q.file_id, { reply_to_message_id: replyToId }); break;
-      default:
-        await ctx.reply(q.content_text || (q.question_text || ''), { reply_to_message_id: replyToId });
-    }
-  } catch (e) {
+  try { await sendContent(ctx, q, replyToId); }
+  catch (e) {
     logger.error('[game_builder] send content failed: ' + e.message);
     await ctx.reply('❌ خطأ فـ إرسال محتوى السؤال.').catch(() => {});
     return null;
   }
 
   const startTime = Date.now();
-  const timer = setTimeout(() => {
+  const timer = setTimeout(async () => {
     const s = _sessions.get(ctx.chat.id);
     if (!s || s.questionId !== q.id) return;
     _sessions.delete(ctx.chat.id);
+    if (game.show_answer) {
+      const dur = Math.max(1, game.answer_display_seconds || 5);
+      const msg = await ctx.reply('⌛ *انتهى الوقت!*\n✅ الإجابة الصحيحة: ' + answers[0], { parse_mode: 'Markdown' }).catch(() => null);
+      if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {}), dur * 1000);
+    }
   }, timeLimit * 1000);
 
   _sessions.set(ctx.chat.id, {
     gameId: game.id, questionId: q.id, answers: answers.map(normAnswer),
     reward: q.reward || 0, timer, name: game.name, startTime,
+    showAnswer: !!game.show_answer, answerDisplaySeconds: game.answer_display_seconds || 5,
+    correctAnswer: answers[0],
   });
   return true;
 }
@@ -106,7 +130,7 @@ async function checkGameTrigger(ctx) {
   await endSession(ctx.chat.id);
 
   const q = await pickQuestion(game.id);
-  if (!q) return ctx.reply('⚠️ لعبة "' + game.name + '" ما فيهاش أسئلة مفعّلة حالياً.').catch(() => {});
+  if (!q) return ctx.reply('⚠️ لعبة "' + game.name + '" ما فيهاش محتوى مفعّل حالياً.').catch(() => {});
 
   return sendQuestion(ctx, game, q, ctx.message.message_id);
 }
@@ -128,9 +152,11 @@ async function checkGameSkip(ctx) {
   const game = await get('SELECT * FROM custom_games WHERE id=$1', [gameId]).catch(() => null);
   await endSession(ctx.chat.id);
   if (!game) return ctx.reply('⏭️ تم إلغاء السؤال.').catch(() => {});
+  game.has_answer = Number(game.has_answer) || 0;
+  game.show_answer = Number(game.show_answer) || 0;
 
   const q = await pickQuestion(gameId);
-  if (!q) return ctx.reply('⏭️ تم الإلغاء — ما فيه أسئلة أخرى فهاذ اللعبة.').catch(() => {});
+  if (!q) return ctx.reply('⏭️ تم الإلغاء — ما فيه محتوى آخر فهاذ اللعبة.').catch(() => {});
 
   return sendQuestion(ctx, game, q, ctx.message.message_id);
 }
@@ -168,21 +194,30 @@ async function checkGameAnswer(ctx) {
     }
   }
 
-  return ctx.reply(
+  const winMsg = await ctx.reply(
     `• اجابة صحيحة ← ${mention}\n` +
     `• اللعبة ← ${sess.name}\n` +
     `• عدد الثواني ← ${elapsed}\n` +
     (sess.reward > 0 ? `• فلوسك ← (${Math.floor(newBal).toLocaleString()} DA 🤑)\n` : '') +
     `-`,
     { reply_to_message_id: ctx.message.message_id, parse_mode: 'Markdown' }
-  ).catch(() => {});
+  ).catch(() => null);
+
+  if (sess.showAnswer) {
+    const dur = Math.max(1, sess.answerDisplaySeconds || 5);
+    const ansMsg = await ctx.reply('✅ الإجابة الصحيحة: ' + sess.correctAnswer).catch(() => null);
+    if (ansMsg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, ansMsg.message_id).catch(() => {}), dur * 1000);
+  }
+
+  return winMsg;
 }
 
-// 🎛️ بدء لعبة مباشرة عبر ID (تُستخدم من الأزرار — نفس منطق checkGameTrigger بدون الاعتماد على نص)
 async function startGameById(ctx, gameId) {
   if (!['group', 'supergroup'].includes(ctx.chat?.type)) return false;
-  const game = await get('SELECT id, name, keyword FROM custom_games WHERE id=$1 AND is_active=1', [gameId]).catch(() => null);
+  const game = await get('SELECT * FROM custom_games WHERE id=$1 AND is_active=1', [gameId]).catch(() => null);
   if (!game) return ctx.answerCbQuery('⚠️ اللعبة غير متاحة حالياً', { show_alert: true }).catch(() => {});
+  game.has_answer = Number(game.has_answer) || 0;
+  game.show_answer = Number(game.show_answer) || 0;
 
   const existing = _sessions.get(ctx.chat.id);
   if (existing && existing.gameId !== game.id) {
@@ -191,7 +226,7 @@ async function startGameById(ctx, gameId) {
   await endSession(ctx.chat.id);
 
   const q = await pickQuestion(game.id);
-  if (!q) return ctx.answerCbQuery('⚠️ لعبة "' + game.name + '" ما فيهاش أسئلة مفعّلة حالياً.', { show_alert: true }).catch(() => {});
+  if (!q) return ctx.answerCbQuery('⚠️ لعبة "' + game.name + '" ما فيهاش محتوى مفعّل حالياً.', { show_alert: true }).catch(() => {});
 
   await ctx.answerCbQuery('▶️ ' + game.name).catch(() => {});
   return sendQuestion(ctx, game, q, ctx.callbackQuery?.message?.message_id);
