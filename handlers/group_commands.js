@@ -1018,28 +1018,12 @@ async function handleSettingsCallback(ctx, data) {
 }
 
 
-async function showGamesMenu(ctx) {
+// 🎛️ المحتوى المشترك للوحة الألعاب (نص + كيبورد فقط) — تستخدمها showGamesMenu وأيضاً زر "رجوع" بـ callbacks.js
+// حتى لا يصير عندنا نسختين متوازيتين تتفرقان مع الوقت
+async function buildGamesMenuContent() {
   const customGames = await require('../database/db').all(
-    'SELECT name, keyword FROM custom_games WHERE is_active=1 ORDER BY id'
+    'SELECT id, name, keyword FROM custom_games WHERE is_active=1 ORDER BY id'
   ).catch(() => []);
-
-  let customBlock = '';
-  if (customGames.length) {
-    const rows2 = [];
-    for (let i = 0; i < customGames.length; i += 2) {
-      const left  = '❦︎ ' + customGames[i].keyword;
-      const right = customGames[i + 1] ? '❦︎ ' + customGames[i + 1].keyword : '';
-      rows2.push(left.padEnd(22, '\u2003') + right);
-    }
-    // ✅ بدون code-block (```) — نص عادي بلا خط Monospace وبلا زر Copy Code
-    customBlock = '\n\n🎖 *العاب تالين (اكتب الكلمة مباشرة):*\n' + rows2.join('\n');
-  }
-
-  const mainText =
-    '🎮 *ألعاب القروب*\n' +
-    '━━━━━━━━━━━━━━━━━━━━' +
-    customBlock + '\n\n' +
-    '👇 اختر لعبة لمعرفة التفاصيل، أو اكتب الكلمة مباشرة:';
 
   const mainKb = [
     [{ text: '🏆 من سيربح المليون', callback_data: 'grp_game_info_million' },
@@ -1048,10 +1032,28 @@ async function showGamesMenu(ctx) {
      { text: '🎲 صحصح',             callback_data: 'grp_game_info_tod'      }],
   ];
 
-  return ctx.reply(mainText, {
+  // ✅ ألعاب تالين المخصصة كأزرار حقيقية (2×2) — الطريقة الوحيدة المضمونة لمحاذاة عمودين على كل الأجهزة
+  for (let i = 0; i < customGames.length; i += 2) {
+    const row = [{ text: '💎 ' + customGames[i].keyword, callback_data: 'grp_customgame_' + customGames[i].id }];
+    if (customGames[i + 1]) row.push({ text: '💎 ' + customGames[i + 1].keyword, callback_data: 'grp_customgame_' + customGames[i + 1].id });
+    mainKb.push(row);
+  }
+
+  const mainText =
+    '🎮 *ألعاب القروب*\n' +
+    '━━━━━━━━━━━━━━━━━━━━\n\n' +
+    (customGames.length ? '🎖 *العاب تالين* — اضغط أي زر تحت للعب مباشرة، أو اكتب الكلمة:\n\n' : '') +
+    '👇 اختر لعبة لمعرفة التفاصيل:';
+
+  return { text: mainText, keyboard: { inline_keyboard: mainKb } };
+}
+
+async function showGamesMenu(ctx) {
+  const { text, keyboard } = await buildGamesMenuContent();
+  return ctx.reply(text, {
     parse_mode: 'Markdown',
     reply_to_message_id: ctx.message?.message_id,
-    reply_markup: { inline_keyboard: mainKb },
+    reply_markup: keyboard,
   }).catch(() => null);
 }
 
@@ -1064,6 +1066,6 @@ function _reply(ctx, text, delay=10000) {
 }
 
 module.exports = {
-  setupGroupCommands, showGamesMenu, handleSettingsCallback, showGroupSettings,
+  setupGroupCommands, showGamesMenu, buildGamesMenuContent, handleSettingsCallback, showGroupSettings,
   getTarget, parseDuration, isTgAdmin, _reply, delCmd,
 };

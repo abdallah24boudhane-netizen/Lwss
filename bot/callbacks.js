@@ -241,6 +241,7 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'cg_',         fn: (ctx, d) => require('../handlers/game_builder_admin').handleCallback(ctx, d) },
     { p: 'grp_main',    fn: (ctx, d) => { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? groupPanel.showMainMenu(ctx) : groupPanel.showMyGroups(ctx); } },
     { p: 'gp_jreq_',    fn: (ctx, d) => require('../handlers/group_join_requests').handleCallback(ctx, d) },
+    { p: 'grp_customgame_', fn: (ctx, d) => require('../handlers/game_builder').startGameById(ctx, d.replace('grp_customgame_', '')) },
     { p: 'gp_topicdel_', fn: (ctx, d) => require('../handlers/group_topics').handleCallback(ctx, d) },
     { p: 'gp_promo_',   fn: (ctx, d) => require('../handlers/group_promote_panel').handleCallback(ctx, d) },
     { p: 'gp_',         fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
@@ -1639,30 +1640,13 @@ module.exports.registerCallbacks = function(bot, deps) {
     }).catch(() => {});
   }
 
-  // ── رجوع للقائمة الرئيسية للألعاب ──
+  // ── رجوع للقائمة الرئيسية للألعاب — نفس الدالة المشتركة تماماً، بلا تكرار ──
   if (data === 'grp_game_back') {
-    const { get: dbG } = require('../database/db');
-    const qc = await dbG('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c:0 }));
-    const mainText =
-      '🎮 *ألعاب القروب*\n' +
-      '━━━━━━━━━━━━━━━━━━━━\n\n' +
-      '🏆 *من سيربح المليون*\n' +
-      '📸 *خمّن الصورة*\n' +
-      '🎲 *قلب العملة*\n' +
-      '🦹 *السرقة*\n' +
-      '🏦 *البنك والمكافآت*\n\n' +
-      '👇 اختر لعبة لمعرفة التفاصيل:';
-    const mainKb = [
-      [{ text: '🏆 من سيربح المليون', callback_data: 'grp_game_info_million' }],
-      [{ text: '📸 خمّن الصورة',      callback_data: 'grp_game_info_guess'   }],
-      [{ text: '🎲 قلب العملة',       callback_data: 'grp_game_info_flip'    }],
-      [{ text: '🦹 السرقة',           callback_data: 'grp_game_info_rob'     }],
-      [{ text: '🏦 البنك',            callback_data: 'grp_game_info_bank'    }],
-    ];
+    const { text: mainText, keyboard: mainKb } = await require('../handlers/group_commands').buildGamesMenuContent();
     await ctx.answerCbQuery('').catch(() => {});
     return ctx.editMessageText(mainText, {
       parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: mainKb }
+      reply_markup: mainKb
     }).catch(() => {});
   }
 

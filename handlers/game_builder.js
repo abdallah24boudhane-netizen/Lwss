@@ -178,4 +178,23 @@ async function checkGameAnswer(ctx) {
   ).catch(() => {});
 }
 
-module.exports = { checkGameTrigger, checkGameAnswer, checkGameSkip, invalidateKeywordsCache, normAnswer };
+// 🎛️ بدء لعبة مباشرة عبر ID (تُستخدم من الأزرار — نفس منطق checkGameTrigger بدون الاعتماد على نص)
+async function startGameById(ctx, gameId) {
+  if (!['group', 'supergroup'].includes(ctx.chat?.type)) return false;
+  const game = await get('SELECT id, name, keyword FROM custom_games WHERE id=$1 AND is_active=1', [gameId]).catch(() => null);
+  if (!game) return ctx.answerCbQuery('⚠️ اللعبة غير متاحة حالياً', { show_alert: true }).catch(() => {});
+
+  const existing = _sessions.get(ctx.chat.id);
+  if (existing && existing.gameId !== game.id) {
+    return ctx.answerCbQuery('⚠️ فيه لعبة تانية شغالة حالياً بهذا القروب', { show_alert: true }).catch(() => {});
+  }
+  await endSession(ctx.chat.id);
+
+  const q = await pickQuestion(game.id);
+  if (!q) return ctx.answerCbQuery('⚠️ لعبة "' + game.name + '" ما فيهاش أسئلة مفعّلة حالياً.', { show_alert: true }).catch(() => {});
+
+  await ctx.answerCbQuery('▶️ ' + game.name).catch(() => {});
+  return sendQuestion(ctx, game, q, ctx.callbackQuery?.message?.message_id);
+}
+
+module.exports = { checkGameTrigger, checkGameAnswer, checkGameSkip, invalidateKeywordsCache, normAnswer, startGameById };
