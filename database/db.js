@@ -362,6 +362,9 @@ async function initSchema() {
     )
   `); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query("ALTER TABLE custom_games ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''"); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query("ALTER TABLE custom_games ADD COLUMN IF NOT EXISTS has_answer INTEGER DEFAULT 1"); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query("ALTER TABLE custom_games ADD COLUMN IF NOT EXISTS show_answer INTEGER DEFAULT 0"); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query("ALTER TABLE custom_games ADD COLUMN IF NOT EXISTS answer_display_seconds INTEGER DEFAULT 0"); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
   try { if(pg) await pg.query(`
     CREATE TABLE IF NOT EXISTS custom_game_questions (
