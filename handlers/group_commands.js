@@ -1020,6 +1020,10 @@ async function handleSettingsCallback(ctx, data) {
 
 // 🎛️ المحتوى المشترك للوحة الألعاب (نص + كيبورد فقط) — تستخدمها showGamesMenu وأيضاً زر "رجوع" بـ callbacks.js
 // حتى لا يصير عندنا نسختين متوازيتين تتفرقان مع الوقت
+function _escHtml(t) {
+  return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 async function buildGamesMenuContent() {
   const customGames = await require('../database/db').all(
     'SELECT id, name, keyword FROM custom_games WHERE is_active=1 ORDER BY id'
@@ -1032,26 +1036,35 @@ async function buildGamesMenuContent() {
      { text: '🎲 صحصح',             callback_data: 'grp_game_info_tod'      }],
   ];
 
-  // ✅ ألعاب تالين المخصصة كأزرار حقيقية (2×2) — الطريقة الوحيدة المضمونة لمحاذاة عمودين على كل الأجهزة
-  for (let i = 0; i < customGames.length; i += 2) {
-    const row = [{ text: '💎 ' + customGames[i].keyword, callback_data: 'grp_customgame_' + customGames[i].id }];
-    if (customGames[i + 1]) row.push({ text: '💎 ' + customGames[i + 1].keyword, callback_data: 'grp_customgame_' + customGames[i + 1].id });
-    mainKb.push(row);
+  // ✅ نص بمحاذاة عمودين حقيقية عبر <code> (Monospace) لكل سطر — بلا Code Block كامل، فما يطلعش زر Copy
+  let customBlock = '';
+  if (customGames.length) {
+    const lines = [];
+    for (let i = 0; i < customGames.length; i += 2) {
+      const left  = ('• ' + customGames[i].keyword).padEnd(18, ' ');
+      const right = customGames[i + 1] ? '• ' + customGames[i + 1].keyword : '';
+      lines.push('<code>' + _escHtml(left + right) + '</code>');
+    }
+    customBlock =
+      '\n\n🎖 <b>العاب تالين</b> (اكتب الكلمة مباشرة):\n' +
+      '⏞'.repeat(18) + '\n' +
+      lines.join('\n') + '\n' +
+      '⏟'.repeat(18);
   }
 
   const mainText =
-    '🎮 *ألعاب القروب*\n' +
-    '━━━━━━━━━━━━━━━━━━━━\n\n' +
-    (customGames.length ? '🎖 *العاب تالين* — اضغط أي زر تحت للعب مباشرة، أو اكتب الكلمة:\n\n' : '') +
-    '👇 اختر لعبة لمعرفة التفاصيل:';
+    '🎮 <b>ألعاب القروب</b>\n' +
+    '━━━━━━━━━━━━━━━━━━━━' +
+    customBlock + '\n\n' +
+    '👇 اختر لعبة لمعرفة التفاصيل، أو اكتب الكلمة مباشرة:';
 
-  return { text: mainText, keyboard: { inline_keyboard: mainKb } };
+  return { text: mainText, keyboard: { inline_keyboard: mainKb }, parseMode: 'HTML' };
 }
 
 async function showGamesMenu(ctx) {
-  const { text, keyboard } = await buildGamesMenuContent();
+  const { text, keyboard, parseMode } = await buildGamesMenuContent();
   return ctx.reply(text, {
-    parse_mode: 'Markdown',
+    parse_mode: parseMode || 'Markdown',
     reply_to_message_id: ctx.message?.message_id,
     reply_markup: keyboard,
   }).catch(() => null);

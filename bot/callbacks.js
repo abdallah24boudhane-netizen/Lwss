@@ -1642,10 +1642,10 @@ module.exports.registerCallbacks = function(bot, deps) {
 
   // ── رجوع للقائمة الرئيسية للألعاب — نفس الدالة المشتركة تماماً، بلا تكرار ──
   if (data === 'grp_game_back') {
-    const { text: mainText, keyboard: mainKb } = await require('../handlers/group_commands').buildGamesMenuContent();
+    const { text: mainText, keyboard: mainKb, parseMode } = await require('../handlers/group_commands').buildGamesMenuContent();
     await ctx.answerCbQuery('').catch(() => {});
     return ctx.editMessageText(mainText, {
-      parse_mode: 'Markdown',
+      parse_mode: parseMode || 'Markdown',
       reply_markup: mainKb
     }).catch(() => {});
   }
