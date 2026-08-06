@@ -63,7 +63,7 @@ async function sendContent(ctx, q, replyToId) {
     case 'video':    return ctx.replyWithVideo(q.file_id, opts);
     case 'animation':return ctx.replyWithAnimation(q.file_id, opts);
     case 'audio':    return ctx.replyWithAudio(q.file_id, opts);
-    case 'voice':    return ctx.replyWithVoice(q.file_id, { reply_to_message_id: replyToId });
+    case 'voice':    return ctx.replyWithVoice(q.file_id, opts);
     case 'document': return ctx.replyWithDocument(q.file_id, opts);
     case 'sticker':  return ctx.replyWithSticker(q.file_id, { reply_to_message_id: replyToId });
     default:
