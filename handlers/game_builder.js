@@ -7,6 +7,7 @@ const KEYWORDS_CACHE_KEY = 'cg_keywords_map';
 const KEYWORDS_TTL = 60;
 const _sessions = new Map();
 const _lastQuestion = new Map();
+const _lastShown = new Map();
 
 function normAnswer(t) {
   return String(t || '').trim().toLowerCase()
@@ -72,10 +73,18 @@ async function sendContent(ctx, q, replyToId) {
 
 async function sendQuestion(ctx, game, q, replyToId) {
   if (!game.has_answer) {
-    try { await sendContent(ctx, q, replyToId); }
+    let sent;
+    try { sent = await sendContent(ctx, q, replyToId); }
     catch (e) {
       logger.error('[game_builder] send content failed: ' + e.message);
       await ctx.reply('❌ خطأ فـ إرسال محتوى اللعبة.').catch(() => {});
+      return null;
+    }
+    if (game.show_answer && q.explanation) {
+      _lastShown.set(ctx.chat.id, {
+        messageId: sent?.message_id, answerText: q.explanation,
+        answerDisplaySeconds: game.answer_display_seconds || 0,
+      });
     }
     return true;
   }
@@ -88,30 +97,31 @@ async function sendQuestion(ctx, game, q, replyToId) {
   }
   const timeLimit = Math.max(10, Math.min(q.time_limit || 60, 600));
 
-  try { await sendContent(ctx, q, replyToId); }
+  let sent;
+  try { sent = await sendContent(ctx, q, replyToId); }
   catch (e) {
     logger.error('[game_builder] send content failed: ' + e.message);
     await ctx.reply('❌ خطأ فـ إرسال محتوى السؤال.').catch(() => {});
     return null;
   }
 
+  if (game.show_answer) {
+    _lastShown.set(ctx.chat.id, {
+      messageId: sent?.message_id, answerText: answers[0],
+      answerDisplaySeconds: game.answer_display_seconds || 0,
+    });
+  }
+
   const startTime = Date.now();
-  const timer = setTimeout(async () => {
+  const timer = setTimeout(() => {
     const s = _sessions.get(ctx.chat.id);
     if (!s || s.questionId !== q.id) return;
     _sessions.delete(ctx.chat.id);
-    if (game.show_answer) {
-      const dur = Math.max(1, game.answer_display_seconds || 5);
-      const msg = await ctx.reply('⌛ *انتهى الوقت!*\n✅ الإجابة الصحيحة: ' + answers[0], { parse_mode: 'Markdown' }).catch(() => null);
-      if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {}), dur * 1000);
-    }
   }, timeLimit * 1000);
 
   _sessions.set(ctx.chat.id, {
     gameId: game.id, questionId: q.id, answers: answers.map(normAnswer),
     reward: q.reward || 0, timer, name: game.name, startTime,
-    showAnswer: !!game.show_answer, answerDisplaySeconds: game.answer_display_seconds || 5,
-    correctAnswer: answers[0],
   });
   return true;
 }
@@ -194,22 +204,33 @@ async function checkGameAnswer(ctx) {
     }
   }
 
-  const winMsg = await ctx.reply(
+  return ctx.reply(
     `• اجابة صحيحة ← ${mention}\n` +
     `• اللعبة ← ${sess.name}\n` +
     `• عدد الثواني ← ${elapsed}\n` +
     (sess.reward > 0 ? `• فلوسك ← (${Math.floor(newBal).toLocaleString()} DA 🤑)\n` : '') +
     `-`,
     { reply_to_message_id: ctx.message.message_id, parse_mode: 'Markdown' }
-  ).catch(() => null);
+  ).catch(() => {});
+}
 
-  if (sess.showAnswer) {
-    const dur = Math.max(1, sess.answerDisplaySeconds || 5);
-    const ansMsg = await ctx.reply('✅ الإجابة الصحيحة: ' + sess.correctAnswer).catch(() => null);
-    if (ansMsg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, ansMsg.message_id).catch(() => {}), dur * 1000);
+async function checkAnswerReveal(ctx) {
+  if (!['group', 'supergroup'].includes(ctx.chat?.type)) return false;
+  const text = ctx.message?.text?.trim();
+  if (!text || normAnswer(text) !== normAnswer('اجابة')) return false;
+
+  const replyTo = ctx.message.reply_to_message;
+  if (!replyTo) return false;
+
+  const shown = _lastShown.get(ctx.chat.id);
+  if (!shown || shown.messageId !== replyTo.message_id) return false;
+  if (!shown.answerText) return false;
+
+  const msg = await ctx.reply('📖 ' + shown.answerText, { reply_to_message_id: ctx.message.message_id }).catch(() => null);
+  if (msg && shown.answerDisplaySeconds > 0) {
+    setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {}), shown.answerDisplaySeconds * 1000);
   }
-
-  return winMsg;
+  return true;
 }
 
 async function startGameById(ctx, gameId) {
@@ -232,4 +253,4 @@ async function startGameById(ctx, gameId) {
   return sendQuestion(ctx, game, q, ctx.callbackQuery?.message?.message_id);
 }
 
-module.exports = { checkGameTrigger, checkGameAnswer, checkGameSkip, invalidateKeywordsCache, normAnswer, startGameById };
+module.exports = { checkGameTrigger, checkGameAnswer, checkGameSkip, checkAnswerReveal, invalidateKeywordsCache, normAnswer, startGameById };

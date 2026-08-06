@@ -25,7 +25,6 @@ async function startNewGame(ctx) {
   return ctx.reply('🎮 اسم اللعبة الجديدة:\n_(أو /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
 }
 
-// 💾 إدراج اللعبة فعلياً بقاعدة البيانات — نقطة نهاية واحدة لكل مسارات الإنشاء (بلا/بإجابة/بعرض إجابة)
 async function createGameRecord(ctx, state) {
   try {
     const row = await get(
@@ -36,8 +35,8 @@ async function createGameRecord(ctx, state) {
     );
     invalidateKeywordsCache();
     await delState(ctx.uid);
-    await ctx.reply('✅ اللعبة "' + state.name + '" اتخلقت! (رقمها #' + row.id + ')\n\nدروك زيدلها سؤال:', {
-      reply_markup: { inline_keyboard: [[{ text: '➕ إضافة سؤال', callback_data: 'cg_newq_' + row.id }]] }
+    await ctx.reply('✅ اللعبة "' + state.name + '" اتخلقت! (رقمها #' + row.id + ')\n\nدروك زيدلها عنصر/سؤال:', {
+      reply_markup: { inline_keyboard: [[{ text: '➕ إضافة عنصر', callback_data: 'cg_newq_' + row.id }]] }
     }).catch(() => {});
   } catch (e) {
     await delState(ctx.uid);
@@ -46,20 +45,14 @@ async function createGameRecord(ctx, state) {
   }
 }
 
-// 4️⃣ هل اللعبة تتطلب إجابة؟
 async function setHasAnswer(ctx, val) {
   const _sm = require('../utils/stateManager');
   const state = await (_sm.getStateAsync || _sm.getState)(ctx.uid).catch(() => null);
   if (!state || state.type !== 'cg_new_hasans') return ctx.answerCbQuery('⚠️ انتهت الجلسة، ابدأ من جديد.', { show_alert: true }).catch(() => {});
   await ctx.answerCbQuery().catch(() => {});
 
-  if (val === '0') {
-    // مناسبة لألعاب: صراحة، جرأة، كرسي الاعتراف، اختر لاعباً، تحديات... — تُنشأ مباشرة
-    return createGameRecord(ctx, { ...state, has_answer: 0, show_answer: 0, answer_display_seconds: 0 });
-  }
-
-  await setState(ctx.uid, { ...state, type: 'cg_new_showans', has_answer: 1 });
-  return ctx.editMessageText('❓ هل يستطيع البوت عرض الإجابة الصحيحة بعد ما حد يجاوب؟', {
+  await setState(ctx.uid, { ...state, type: 'cg_new_showans', has_answer: val === '1' ? 1 : 0 });
+  return ctx.editMessageText('👁 هل بإمكان اللاعبين رؤية الإجابة أو الشرح (بالرد على السؤال وكتابة "اجابة")؟', {
     reply_markup: { inline_keyboard: [[
       { text: '✅ نعم', callback_data: 'cg_showans_1' },
       { text: '❌ لا',  callback_data: 'cg_showans_0' },
@@ -67,7 +60,6 @@ async function setHasAnswer(ctx, val) {
   }).catch(() => {});
 }
 
-// 5️⃣ هل البوت يعرض الإجابة الصحيحة؟
 async function setShowAnswer(ctx, val) {
   const _sm = require('../utils/stateManager');
   const state = await (_sm.getStateAsync || _sm.getState)(ctx.uid).catch(() => null);
@@ -78,9 +70,8 @@ async function setShowAnswer(ctx, val) {
     return createGameRecord(ctx, { ...state, show_answer: 0, answer_display_seconds: 0 });
   }
 
-  // 6️⃣ مدة ظهور الإجابة قبل ما البوت يحذفها تلقائياً
   await setState(ctx.uid, { ...state, type: 'cg_new_ansdur', show_answer: 1 });
-  return ctx.editMessageText('⏱ كم ثانية تبان الإجابة الصحيحة قبل ما البوت يمسحها تلقائياً؟\nمثال: 10').catch(() => {});
+  return ctx.editMessageText('⏱ كم ثانية تبان الإجابة/الشرح قبل ما البوت يمسحها تلقائياً؟\nمثال: 10').catch(() => {});
 }
 
 async function handleText(ctx, txt, state) {
@@ -125,12 +116,16 @@ async function handleText(ctx, txt, state) {
     else if (msg.document)  { content_type = 'document';  file_id = msg.document.file_id; content_text = msg.caption || ''; }
     else if (msg.sticker)   { content_type = 'sticker';   file_id = msg.sticker.file_id; }
     else                    { content_type = 'text';      content_text = txt; }
+
     if (!state.has_answer) {
-      // ✅ لعبة بلا إجابة (صراحة/جرأة/كرسي الاعتراف...) — تُنشأ العنصر مباشرة بلا خطوات زايدة
+      if (state.show_answer) {
+        await setState(ctx.uid, { ...state, type: 'cg_q_explanation', content_type, content_text, file_id });
+        return ctx.reply('📖 اكتب الإجابة أو الشرح (يبان لما حد يرد بكلمة "اجابة"):').catch(() => {});
+      }
       try {
         await run(
-          `INSERT INTO custom_game_questions(game_id, content_type, content_text, file_id, question_text, answers, reward, time_limit)
-           VALUES($1,$2,$3,$4,'', '[]', 0, 0)`,
+          `INSERT INTO custom_game_questions(game_id, content_type, content_text, file_id, question_text, answers, reward, time_limit, explanation)
+           VALUES($1,$2,$3,$4,'', '[]', 0, 0, '')`,
           [state.gameId, content_type, content_text || '', file_id]
         );
         await delState(ctx.uid);
@@ -145,6 +140,25 @@ async function handleText(ctx, txt, state) {
     }
     await setState(ctx.uid, { ...state, type: 'cg_q_question', content_type, content_text, file_id });
     return ctx.reply('❓ نص السؤال (يظهر تحت المحتوى)، أو اكتب /skip لتجاوزه:').catch(() => {});
+  }
+
+  if (state.type === 'cg_q_explanation') {
+    const explanation = txt.trim();
+    try {
+      await run(
+        `INSERT INTO custom_game_questions(game_id, content_type, content_text, file_id, question_text, answers, reward, time_limit, explanation)
+         VALUES($1,$2,$3,$4,'', '[]', 0, 0, $5)`,
+        [state.gameId, state.content_type, state.content_text || '', state.file_id, explanation]
+      );
+      await delState(ctx.uid);
+      await ctx.reply('✅ تم إضافة العنصر (مع الشرح)!', {
+        reply_markup: { inline_keyboard: [[{ text: '➕ عنصر آخر', callback_data: 'cg_newq_' + state.gameId }, { text: '📋 عرض اللعبة', callback_data: 'cg_view_' + state.gameId }]]}
+      }).catch(() => {});
+    } catch (e) {
+      await delState(ctx.uid);
+      await ctx.reply('❌ فشل: ' + e.message).catch(() => {});
+    }
+    return;
   }
 
   if (state.type === 'cg_q_question') {
@@ -193,9 +207,14 @@ async function viewGame(ctx, gameId) {
   const game = await get('SELECT * FROM custom_games WHERE id=$1', [gameId]).catch(() => null);
   if (!game) return ctx.answerCbQuery('❌ اللعبة غير موجودة', { show_alert: true }).catch(() => {});
   const questions = await all('SELECT id, question_text, is_active, reward FROM custom_game_questions WHERE game_id=$1 ORDER BY id', [gameId]).catch(() => []);
-  let text = `🎮 <b>${game.name}</b>\n🔑 الكلمة: <code>${game.keyword}</code>\n${game.is_active ? '🟢 مفعّلة' : '🔴 معطّلة'}\n━━━━━━━━━━━━━━━━━━\n📋 الأسئلة: <b>${questions.length}</b>`;
+  const hasAns = Number(game.has_answer) || 0;
+  const showAns = Number(game.show_answer) || 0;
+  let text = `🎮 <b>${game.name}</b>\n🔑 الكلمة: <code>${game.keyword}</code>\n${game.is_active ? '🟢 مفعّلة' : '🔴 معطّلة'}\n` +
+    `❓ تتطلب إجابة: <b>${hasAns ? 'نعم' : 'لا'}</b>\n` +
+    `👁 عرض الإجابة/الشرح: <b>${showAns ? 'نعم (' + (game.answer_display_seconds||0) + 'ث)' : 'لا'}</b>\n` +
+    `━━━━━━━━━━━━━━━━━━\n📋 العناصر: <b>${questions.length}</b>`;
   const rows = questions.slice(0, 15).map(q => ([{ text: (q.is_active ? '🟢' : '🔴') + ' #' + q.id + ' — ' + (q.question_text ? q.question_text.slice(0, 25) : '(بلا سؤال نصي)') + ' 💰' + q.reward, callback_data: 'cg_qview_' + q.id + '_' + gameId }]));
-  rows.push([{ text: '➕ سؤال جديد', callback_data: 'cg_newq_' + gameId }]);
+  rows.push([{ text: '➕ عنصر جديد', callback_data: 'cg_newq_' + gameId }]);
   rows.push([{ text: game.is_active ? '🔴 تعطيل اللعبة' : '🟢 تفعيل اللعبة', callback_data: 'cg_toggle_' + gameId }, { text: '🗑 حذف اللعبة', callback_data: 'cg_delgame_' + gameId }]);
   rows.push([{ text: '◀️ رجوع', callback_data: 'cg_home' }]);
   await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: { inline_keyboard: rows } }).catch(() => {});
@@ -230,7 +249,7 @@ async function viewQuestion(ctx, qId, gameId) {
   const q = await get('SELECT * FROM custom_game_questions WHERE id=$1', [qId]).catch(() => null);
   if (!q) return ctx.answerCbQuery('❌ غير موجود', { show_alert: true }).catch(() => {});
   let answers = []; try { answers = JSON.parse(q.answers); } catch {}
-  const text = `❓ <b>سؤال #${q.id}</b>\n━━━━━━━━━━━━━━━━━━\n📎 النوع: ${q.content_type}\n💬 السؤال: ${q.question_text || '—'}\n✅ الإجابات: ${answers.join(', ')}\n💰 المكافأة: ${q.reward}\n⏱ الوقت: ${q.time_limit}ث\n${q.is_active ? '🟢 مفعّل' : '🔴 معطّل'}`;
+  const text = `❓ <b>عنصر #${q.id}</b>\n━━━━━━━━━━━━━━━━━━\n📎 النوع: ${q.content_type}\n💬 السؤال: ${q.question_text || '—'}\n✅ الإجابات: ${answers.join(', ') || '—'}\n📖 الشرح: ${q.explanation || '—'}\n💰 المكافأة: ${q.reward}\n⏱ الوقت: ${q.time_limit}ث\n${q.is_active ? '🟢 مفعّل' : '🔴 معطّل'}`;
   const rows = [[{ text: q.is_active ? '🔴 تعطيل' : '🟢 تفعيل', callback_data: 'cg_qtoggle_' + qId + '_' + gameId }, { text: '🗑 حذف', callback_data: 'cg_qdel_' + qId + '_' + gameId }], [{ text: '◀️ رجوع للعبة', callback_data: 'cg_view_' + gameId }]];
   await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: { inline_keyboard: rows } }).catch(() => {});
   return ctx.answerCbQuery().catch(() => {});
@@ -238,8 +257,12 @@ async function viewQuestion(ctx, qId, gameId) {
 
 async function startNewQuestion(ctx, gameId) {
   if (!isOwner(ctx)) return;
-  const game = await get('SELECT has_answer FROM custom_games WHERE id=$1', [gameId]).catch(() => null);
-  await setState(ctx.uid, { type: 'cg_q_content', gameId: parseInt(gameId), has_answer: game?.has_answer ?? 1 });
+  const game = await get('SELECT has_answer, show_answer FROM custom_games WHERE id=$1', [gameId]).catch(() => null);
+  await setState(ctx.uid, {
+    type: 'cg_q_content', gameId: parseInt(gameId),
+    has_answer: Number(game?.has_answer) || 0,
+    show_answer: Number(game?.show_answer) || 0,
+  });
   await ctx.answerCbQuery().catch(() => {});
   return ctx.reply('📎 ابعت المحتوى (نص/صورة/فيديو/GIF/صوت/فويس/ملف/ملصق):\n_(أو /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
 }

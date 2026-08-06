@@ -175,6 +175,8 @@ const groupProtectionMiddleware = async (ctx, next) => {
   // 🎮 Game Builder System
   if (ctx.message?.text) {
     const gb = require('./handlers/game_builder');
+    gb.checkAnswerReveal(ctx).catch(() => {});
+    gb.checkGameSkip(ctx).catch(() => {});
     gb.checkGameAnswer(ctx).catch(() => {});
     gb.checkGameTrigger(ctx).catch(() => {});
   }
