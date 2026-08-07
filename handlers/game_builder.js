@@ -135,8 +135,7 @@ async function checkGameTrigger(ctx) {
   const game = map.get(normAnswer(text));
   if (!game) return false;
 
-  const existing = _sessions.get(ctx.chat.id);
-  if (existing && existing.gameId !== game.id) return false;
+  // ✅ كلمة مفتاحية جديدة تقفل أي لعبة نشطة فوراً وتبدأ هذي، بلا انتظار
   await endSession(ctx.chat.id);
 
   const q = await pickQuestion(game.id);
@@ -240,10 +239,7 @@ async function startGameById(ctx, gameId) {
   game.has_answer = Number(game.has_answer) || 0;
   game.show_answer = Number(game.show_answer) || 0;
 
-  const existing = _sessions.get(ctx.chat.id);
-  if (existing && existing.gameId !== game.id) {
-    return ctx.answerCbQuery('⚠️ فيه لعبة تانية شغالة حالياً بهذا القروب', { show_alert: true }).catch(() => {});
-  }
+  // ✅ نفس الشيء من الزر — نقفل أي لعبة نشطة ونبدأ هذي فوراً
   await endSession(ctx.chat.id);
 
   const q = await pickQuestion(game.id);
