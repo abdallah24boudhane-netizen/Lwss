@@ -138,12 +138,23 @@ const rateLimit = (ctx, next) => {
 // FIX 1: تحقق هل البوت أدمن — middleware مستقل على المستوى الأعلى
 // (كان متداخل داخل bot.use آخر = memory leak + double processing)
 // ══════════════════════════════════════════
+// ⚡ PERF FIX: كاش 5 دقائق لحالة "البوت أدمن" — كان getChatMember يُستدعى (رحلة شبكة
+// كاملة لتيليجرام) على *كل* أمر '/' بكل قروب بدون أي كاش. نفس مدة الكاش المستخدمة
+// لفحوصات الأدمن الأخرى بالمشروع (utils/adminCache.js، group_protection.js).
+// يتحدّث فوراً عند ترقية/إزالة البوت عبر my_chat_member (شوف launch() تحت).
+const { cacheGet: _bacGet, cacheSet: _bacSet } = require('./utils/cache');
 const botAdminCheck = async (ctx, next) => {
   if (!['group', 'supergroup'].includes(ctx.chat?.type)) return next();
   if (!ctx.message?.text?.startsWith('/')) return next();
+  const _bacKey = 'botadm_' + ctx.chat.id;
   try {
-    const me = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
-    if (me.status === 'administrator' || me.status === 'creator') return next();
+    let isAdm = _bacGet(_bacKey);
+    if (isAdm === null) {
+      const me = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
+      isAdm = (me.status === 'administrator' || me.status === 'creator');
+      _bacSet(_bacKey, isAdm, 300000);
+    }
+    if (isAdm) return next();
     const botUn = ctx.botInfo?.username || '';
     await ctx.reply(
       '⚠️ أنا لست مشرفاً في هذا القروب!\n\nلكي تعمل الأوامر بشكل صحيح، يرجى إضافتي كمشرف 👇',
@@ -274,8 +285,8 @@ const groupProtectionMiddleware = async (ctx, next) => {
       ctx.message?.text || ctx.message?.caption || '',
       ctx.message?.message_id
     ).catch(() => {});
-    // 📊 تتبع عدد الرسائل
-    require('./handlers/group_pro_features').trackMsg(cid, uid, ctx.from.first_name).catch(() => {});
+    // 📊 تتبع عدد الرسائل (+ username صار يُحفظ هنا، شوف ملاحظة PERF FIX بـ trackMsg)
+    require('./handlers/group_pro_features').trackMsg(cid, uid, ctx.from.first_name, ctx.from.username).catch(() => {});
   }
 
   // حماية الأدمنز من فلاتر الحماية
@@ -723,10 +734,12 @@ async function launch() {
           if (['member', 'administrator'].includes(member?.status)) {
             // لو مش ادمين — اخرج فوراً
             if (member?.status === 'member') {
+              _bacSet('botadm_' + chat.id, false, 300000); // ⚡ حدّث كاش فوراً (مو ضروري لأن البوت هيخرج، بس للسلامة)
               logger.warn('[GroupReg] مش ادمين — خروج من: ' + (chat.title || chat.id));
               bot.telegram.leaveChat(chat.id).catch(() => {});
               return;
             }
+            _bacSet('botadm_' + chat.id, true, 300000); // ⚡ ترقية لأدمن — حدّث الكاش فوراً بدل انتظار انتهاء TTL
             await dbRun(
               `INSERT INTO group_chats(chat_id, title, specialty_id, welcome_enabled, goodbye_enabled, notify_new_files, added_by)
                VALUES($1,$2,0,1,0,1,$3)
@@ -735,6 +748,7 @@ async function launch() {
             ).catch(() => {});
             logger.info('[GroupReg] ✅ أُضيف البوت لـ: ' + (chat.title || chat.id));
           } else if (['left', 'kicked'].includes(member?.status)) {
+            cacheClear('botadm_' + chat.id); // ⚡ نظافة كاش — البوت مو موجود بالقروب أصلاً
             await dbRun('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [chat.id]).catch(() => {});
             logger.info('[GroupReg] 🚪 خرج البوت من: ' + (chat.title || chat.id));
           }
@@ -799,15 +813,10 @@ async function launch() {
             [chat.id, chat.title || '']
           ).catch(() => {});
 
-          const u = ctx.from;
-          if (u && !u.is_bot) {
-            dbRun(
-              `INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at)
-               VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
-               ON CONFLICT(chat_id,user_id) DO UPDATE SET updated_at=CURRENT_TIMESTAMP`,
-              [chat.id, u.id, u.username || '', u.first_name || '']
-            ).catch(() => {});
-          }
+          // ⚡ PERF FIX: شيلنا هنا كتابة group_members المباشرة — كانت مكررة مع
+          // trackMsg() (بـ groupProtectionMiddleware، تشتغل قبل هذا الهاندلر بالسلسلة
+          // لكل رسالة) اللي صارت تحفظ username كمان الحين. كان الجدول يتكتب مرتين
+          // منفصلتين على كل رسالة قروب بلا داعي.
         } catch(_) {}
         return next();
       });

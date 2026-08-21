@@ -205,13 +205,17 @@ async function handleSetWarnLimit(ctx) {
 // ══════════════════════════════════════════════════════════
 // 📊 4. /topactive — أكثر الأعضاء إرسالاً (msg_count حقيقي)
 // ══════════════════════════════════════════════════════════
-async function trackMsg(chatId, userId, firstName) {
+// ⚡ PERF FIX: صار الاستعلام يشيل username كمان (كان index.js يسوي INSERT/UPDATE منفصل
+// بنفس الجدول group_members على *كل* رسالة فقط عشان يحفظ username — دُمج هنا بستعلام
+// واحد بدل استعلامين على كل رسالة. username تُحفظ عند أول INSERT فقط (نفس سلوك الكود
+// القديم بالضبط)، و msg_count/last_active/updated_at تتحدّث بكل رسالة كما كانت.
+async function trackMsg(chatId, userId, firstName, username) {
   run(
-    `INSERT INTO group_members(chat_id,user_id,first_name,msg_count,last_active,updated_at)
-     VALUES($1,$2,$3,1,NOW(),NOW())
+    `INSERT INTO group_members(chat_id,user_id,username,first_name,msg_count,last_active,updated_at)
+     VALUES($1,$2,$3,$4,1,NOW(),NOW())
      ON CONFLICT(chat_id,user_id) DO UPDATE
        SET msg_count=group_members.msg_count+1, last_active=NOW(), updated_at=NOW()`,
-    [chatId, userId, firstName || '']
+    [chatId, userId, username || '', firstName || '']
   ).catch(() => {});
 }
 

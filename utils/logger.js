@@ -26,7 +26,11 @@ function _rotate() {
 }
 
 function _flush() {
-  if (!buf || IS_RAILWAY) return;
+  if (!buf) return;
+  // ⚡ PERF FIX: على Railway ما كنا نكتب على ملف (وهذا صحيح ومقصود)، بس buf كانت
+  // تبقى تتراكم للأبد لأن الدالة كانت ترجع *قبل* تصفيرها = تسرب ذاكرة طول عمر البروسيس.
+  // console.log/warn/error (اللي Railway فعلياً يقرأ منها اللوغز) ما تأثرت ولا تتأثر هنا إطلاقاً.
+  if (IS_RAILWAY) { buf = ''; return; }
   _rotate();
   const d = buf; buf = '';
   fs.appendFile(ERR_LOG, d, () => {});
