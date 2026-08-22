@@ -77,7 +77,10 @@ async function authMiddleware(ctx, next) {
     const cachedAdmin = _admCache.get(uid);
     const cachedBan   = cacheGet('ban_' + uid);
     const cachedSub   = cacheGet('sub_ok_' + uid);
-    if (cachedAdmin && cachedBan !== undefined && (cachedSub === true || ctx.chat?.type !== 'private')) {
+    // 🔧 FIX: cacheGet ترجّع null لما ما تكون بالكاش (مو undefined) — الشرط القديم
+    // (!== undefined) كان صحيح دايماً حتى لو ما فيه كاش فعلي، فيتجاوز فحص الحظر بالكامل
+    // لأي تفاعل بأزرار (callback). صار يتحقق فعلاً إذا كان محفوظ بالكاش أو لأ.
+    if (cachedAdmin && cachedBan !== null && (cachedSub === true || ctx.chat?.type !== 'private')) {
       ctx.isAdmin    = cachedAdmin.data.isAdmin;
       ctx.adminPerms = cachedAdmin.data.perms;
       if (!ctx.isAdmin && cachedBan === 1) {
@@ -88,19 +91,26 @@ async function authMiddleware(ctx, next) {
     }
   }
 
+  // 🔧 FIX: كان يفحص جدول user_bans اللي ما موجود أصلاً بقاعدة البيانات (SELECT فاشل
+  // على كل رسالة). نظام الحظر الحقيقي والشغّال بالمشروع هو global_bans (شوف
+  // handlers/group_advanced.js — عنده أوامر حظر/فك حظر فعلية). حظر دائم بدون
+  // تاريخ انتهاء (نفس افتراض global_bans بكل مكان تاني يُستخدم فيه).
   const banCached = await cacheGetAsync('ban_' + uid);
   const [info, banRow] = await Promise.all([
     getAdminInfo(uid),
-    banCached === null ? get('SELECT * FROM user_bans WHERE user_id=$1 AND (expires_at IS NULL OR expires_at > NOW()) LIMIT 1', [uid]).catch(()=>null) : Promise.resolve(null),
+    banCached === null ? get('SELECT user_id FROM global_bans WHERE user_id=$1 LIMIT 1', [uid]).catch(()=>null) : Promise.resolve(null),
   ]);
   ctx.isAdmin    = info.isAdmin;
   ctx.adminPerms = info.perms;
 
   if (!ctx.isAdmin) {
     let banned = banCached;
-    if (banned === undefined) {
-      banned = banRow?.is_banned ? 1 : 0;
-      await cacheSetAsync('ban_' + uid, banned, 3600000); // 30min — يُحفظ في Redis
+    // 🔧 FIX: كان الشرط (=== undefined) بس cacheGetAsync ترجّع null دايماً لما ما
+    // يكون بالكاش — يعني هذا الشرط ما كان يصير true أبداً، فالنتيجة ما كانت تتخزّن
+    // بالكاش إطلاقاً، والاستعلام كان يتكرر على كل رسالة بدل مرة كل ساعة.
+    if (banned === null) {
+      banned = banRow ? 1 : 0; // global_bans: وجود صف = محظور (ما فيه عمود is_banned)
+      await cacheSetAsync('ban_' + uid, banned, 3600000); // 60min — يُحفظ في Redis
     }
     if (banned === 1) {
       return ctx.reply('🚫 أنت محظور من استخدام البوت.').catch(() => {});
