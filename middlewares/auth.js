@@ -91,14 +91,15 @@ async function authMiddleware(ctx, next) {
     }
   }
 
-  // 🔧 FIX: كان يفحص جدول user_bans اللي ما موجود أصلاً بقاعدة البيانات (SELECT فاشل
-  // على كل رسالة). نظام الحظر الحقيقي والشغّال بالمشروع هو global_bans (شوف
-  // handlers/group_advanced.js — عنده أوامر حظر/فك حظر فعلية). حظر دائم بدون
-  // تاريخ انتهاء (نفس افتراض global_bans بكل مكان تاني يُستخدم فيه).
+  // 🔧 تصحيح (كان توجيهي السابق لـ global_bans غلط — طلع الجدول نفسه ما موجود
+  // بقاعدة بياناتك أصلاً، شوف تعليقي بالمحادثة). النظام الحقيقي المستخدم بكل
+  // المشروع (database/users.js: ban/unban/isBanned، bot/commands.js، handlers/manage.js،
+  // routes/api.js، وحتى الـ Preload بـindex.js بنفس مفتاح الكاش 'ban_') هو عمود
+  // users.is_banned مباشرة — مو جدول منفصل. رجّعتها له.
   const banCached = await cacheGetAsync('ban_' + uid);
   const [info, banRow] = await Promise.all([
     getAdminInfo(uid),
-    banCached === null ? get('SELECT user_id FROM global_bans WHERE user_id=$1 LIMIT 1', [uid]).catch(()=>null) : Promise.resolve(null),
+    banCached === null ? get('SELECT is_banned FROM users WHERE id=$1', [uid]).catch(()=>null) : Promise.resolve(null),
   ]);
   ctx.isAdmin    = info.isAdmin;
   ctx.adminPerms = info.perms;
@@ -109,7 +110,7 @@ async function authMiddleware(ctx, next) {
     // يكون بالكاش — يعني هذا الشرط ما كان يصير true أبداً، فالنتيجة ما كانت تتخزّن
     // بالكاش إطلاقاً، والاستعلام كان يتكرر على كل رسالة بدل مرة كل ساعة.
     if (banned === null) {
-      banned = banRow ? 1 : 0; // global_bans: وجود صف = محظور (ما فيه عمود is_banned)
+      banned = banRow?.is_banned ? 1 : 0;
       await cacheSetAsync('ban_' + uid, banned, 3600000); // 60min — يُحفظ في Redis
     }
     if (banned === 1) {
