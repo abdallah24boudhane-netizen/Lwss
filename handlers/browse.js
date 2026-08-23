@@ -311,7 +311,7 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   // طريقة eos() المستخدمة بباقي شاشات هذا الملف (showSpecialties/showYears/...).
   // كذا الرسالة تتحول مباشرة لـ"جاري الإرسال" بدل ما تختفي وتسيب فراغ لين
   // يوصل الملف (هذا اللي كان يحس المستخدم فيه كـ"ثقل"/بلاغ مفاجئ).
-  await eos(ctx, '⏳ جاري الإرسال...', { parse_mode:'Markdown' });
+  await eos(ctx, '⏳', {});
 
   var caption = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name||'عام')+'  |  📖 '+escMd(f.sub_name||'عام');
   var kb = build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
