@@ -84,7 +84,11 @@ async function checkAllChannels(bot, userId) {
   );
 
   const missing = results.filter(c => !c.subscribed);
-  if (!missing.length) cacheSet(ck, true, 30_000);
+  // ⚡ PERF FIX: كانت 30 ثانية بس — أقصر كاش بكل المشروع (البقية كلها 5 دقايق+)،
+  // يعني كل ضغطة زر بعد 30 ثانية سكوت = رحلة getChatMember حقيقية جديدة لكل
+  // قناة مطلوبة قبل ما يرد. صارت 5 دقايق زي باقي فحوصات الأدمن/الحظر بالمشروع.
+  // المقايضة: لو حد سحب اشتراكه، بياخد له لحد 5 دقايق (بدل 30 ثا) يرجع يُمنع.
+  if (!missing.length) cacheSet(ck, true, 300_000);
   else cacheClear(ck);
   return { ok: missing.length === 0, missing };
 }
