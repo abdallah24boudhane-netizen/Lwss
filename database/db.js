@@ -264,25 +264,25 @@ async function initSchema() {
   // group_last_welcome (كان في group_pro.js اللي ما يُستدعى)
   try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS group_last_welcome (
     chat_id BIGINT PRIMARY KEY, msg_id BIGINT
-  )`); } catch(err) { require('./logger').debug('[catch]', err.message); }
+  )`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
   // group_messages
   try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS group_messages (
     id SERIAL PRIMARY KEY, chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
-  )`); } catch(err) { require('./logger').debug('[catch]', err.message); }
-  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_group_messages_chat ON group_messages(chat_id)'); } catch(err) { require('./logger').debug('[catch]', err.message); }
+  )`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_group_messages_chat ON group_messages(chat_id)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
   // إصلاح sequence جدول years (كان مكسور بسبب duplicate key)
-  try { if(pg) await pg.query(`SELECT setval('years_id_seq', COALESCE((SELECT MAX(id) FROM years), 1), true)`); } catch(e) { require('./logger').debug('[years_seq]', e.message); }
-  try { if(pg) await pg.query(`SELECT setval('specialties_id_seq', COALESCE((SELECT MAX(id) FROM specialties), 1), true)`); } catch(e) { require('./logger').debug('[specialties_seq]', e.message); }
-  try { if(pg) await pg.query(`SELECT setval('semesters_id_seq', COALESCE((SELECT MAX(id) FROM semesters), 1), true)`); } catch(e) { require('./logger').debug('[semesters_seq]', e.message); }
-  try { if(pg) await pg.query(`SELECT setval('subjects_id_seq', COALESCE((SELECT MAX(id) FROM subjects), 1), true)`); } catch(e) { require('./logger').debug('[subjects_seq]', e.message); }
-  try { if(pg) await pg.query(`SELECT setval('categories_id_seq', COALESCE((SELECT MAX(id) FROM categories), 1), true)`); } catch(e) { require('./logger').debug('[categories_seq]', e.message); }
-  try { if(pg) await pg.query(`SELECT setval('files_id_seq', COALESCE((SELECT MAX(id) FROM files), 1), true)`); } catch(e) { require('./logger').debug('[files_seq]', e.message); }
+  try { if(pg) await pg.query(`SELECT setval('years_id_seq', COALESCE((SELECT MAX(id) FROM years), 1), true)`); } catch(e) { require('../utils/logger').debug('[years_seq]', e.message); }
+  try { if(pg) await pg.query(`SELECT setval('specialties_id_seq', COALESCE((SELECT MAX(id) FROM specialties), 1), true)`); } catch(e) { require('../utils/logger').debug('[specialties_seq]', e.message); }
+  try { if(pg) await pg.query(`SELECT setval('semesters_id_seq', COALESCE((SELECT MAX(id) FROM semesters), 1), true)`); } catch(e) { require('../utils/logger').debug('[semesters_seq]', e.message); }
+  try { if(pg) await pg.query(`SELECT setval('subjects_id_seq', COALESCE((SELECT MAX(id) FROM subjects), 1), true)`); } catch(e) { require('../utils/logger').debug('[subjects_seq]', e.message); }
+  try { if(pg) await pg.query(`SELECT setval('categories_id_seq', COALESCE((SELECT MAX(id) FROM categories), 1), true)`); } catch(e) { require('../utils/logger').debug('[categories_seq]', e.message); }
+  try { if(pg) await pg.query(`SELECT setval('files_id_seq', COALESCE((SELECT MAX(id) FROM files), 1), true)`); } catch(e) { require('../utils/logger').debug('[files_seq]', e.message); }
 
   // migration: specialty_id في users
-  try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS specialty_id INTEGER'); } catch(err) { require('./logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS specialty_id INTEGER'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
   // member_cards migrations
   try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS trigger_word TEXT'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
