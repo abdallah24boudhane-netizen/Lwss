@@ -1,6 +1,7 @@
 'use strict';
 const { all, run } = require('../database/db');
 const { cacheGet, cacheSet, cacheClear, cacheClearPrefix } = require('./cache');
+const { escMd } = require('./common');
 
 // ──────────────────────────────────────────
 //  تحقق من اشتراك مستخدم في قناة واحدة
@@ -126,7 +127,7 @@ async function removeChannel(id) {
 //  رسالة الاشتراك
 // ──────────────────────────────────────────
 function buildSubscribeMessage(missing, userName) {
-  const name  = userName || 'صديقي';
+  const name  = escMd(userName || 'صديقي');
   const total = missing.length;
   let text = '🔐 *' + name + '، مرحباً!*\n\n';
   text += '━━━━━━━━━━━━━━━━\n';
@@ -135,7 +136,7 @@ function buildSubscribeMessage(missing, userName) {
   missing.forEach((ch, i) => {
     const label = ch.channel_name && !/^-?\d+$/.test(ch.channel_name)
       ? ch.channel_name : 'القناة ' + (i + 1);
-    text += (i + 1) + '. 📣 *' + label + '*\n';
+    text += (i + 1) + '. 📣 *' + escMd(label) + '*\n';
   });
   text += '\n━━━━━━━━━━━━━━━━\n';
   text += '1️⃣ اضغط على القناة واشترك\n';
