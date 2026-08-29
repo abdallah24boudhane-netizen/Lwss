@@ -545,6 +545,15 @@ async function initSchema() {
   try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT NULL'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
+  try { if(pg) await pg.query('ALTER TABLE files ADD COLUMN IF NOT EXISTS file_size BIGINT DEFAULT 0'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE group_members ADD COLUMN IF NOT EXISTS joined_at TIMESTAMP DEFAULT NOW()'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS user_xp (
+    user_id   BIGINT PRIMARY KEY,
+    xp        INTEGER DEFAULT 0,
+    level     INTEGER DEFAULT 1,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+
   logger.info('✅ Schema ready');
 }
 
