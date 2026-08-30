@@ -346,7 +346,7 @@ async function applyLockPermissions(ctx, chatId) {
   }
 
   try {
-    await ctx.telegram.setChatPermissions(chatId, merged);
+    await ctx.telegram.setChatPermissions(chatId, merged, { use_independent_chat_permissions: true });
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message };
