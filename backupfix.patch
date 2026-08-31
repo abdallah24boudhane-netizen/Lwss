@@ -1,0 +1,30 @@
+diff --git a/utils/backup_full.js b/utils/backup_full.js
+index 1d70b48..3e1cbb2 100644
+--- a/utils/backup_full.js
++++ b/utils/backup_full.js
+@@ -25,11 +25,18 @@ const ALL_TABLES = [
+   // ── ألعاب ──
+   'million_questions','million_games','million_answers','million_scores','million_stats',
+   'guess_games','couple_of_day','poll_options','poll_votes','polls',
++  // ⚡ كانت غايبة تماماً (مو حتى "فشلت" — ما كانت تُحاول أصلاً): ألعاب مخصّصة
++  // فيها صور/تحديات (custom_game_questions.file_id) + Werewolf (لوب غارو) + ToD
++  'custom_games','custom_game_questions',
++  'ww_games','ww_achievements','ww_game_events','ww_season_stats','ww_stats',
++  'tod_sessions','tod_settings','tod_stats','tod_achievements','tod_global_defaults',
+   // ── قروبات - حماية وإدارة ──
+   'group_chats','group_bans','group_warns','group_members','group_messages',
+   'group_locks','group_filters','group_notes','group_reports','group_schedules',
+   'group_tempbans','group_verify','group_violations','group_watching','group_welcome',
+   'group_protection','group_notify_log','group_bot_msgs','group_last_welcome',
++  // ⚡ كانت غايبة كمان (نسخة group_ منفصلة عن نظيراتها grp_ تحت — احتياطاً نرجّع الكل)
++  'group_approved','group_known_topics','group_logs','group_protection_stats','group_roles',
+   'grp_settings','grp_logs','grp_member_stats','grp_roles',
+   'grp_blacklist','grp_blacklist_words','grp_approved','grp_gbans',
+   'global_bans',
+@@ -42,7 +49,7 @@ const ALL_TABLES = [
+   'nation_elections','nation_events','nation_ministers','nation_projects',
+   'nation_seasons','nation_تech','nation_wars','world_lands',
+   // ── متفرقات ──
+-  'afk_users','ai_history','logs','settings','cache_store',
++  'afk_users','ai_history','logs','settings','cache_store','global_help_file',
+ ];

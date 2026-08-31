@@ -1,0 +1,40 @@
+diff --git a/handlers/browse.js b/handlers/browse.js
+index debb249..2e331c1 100644
+--- a/handlers/browse.js
++++ b/handlers/browse.js
+@@ -307,7 +307,12 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
+   var f=results[0], fav=results[1];
+   if (!f) return ctx.reply('❌ الملف غير موجود.').catch(function(){});
+ 
+-  // ⚡ 3. حذف الرسالة القديمة + إرسال الملف بالتوازي
++  // ⚡ 3. عدّل الرسالة الحالية (قائمة الملفات) لمؤشر ⏳ بدل حذفها فوراً — نفس
++  // طريقة eos() المستخدمة بباقي شاشات هذا الملف (showSpecialties/showYears/...).
++  // كذا الرسالة تتحول مباشرة لـ"جاري الإرسال" بدل ما تختفي وتسيب فراغ لين
++  // يوصل الملف (هذا اللي كان يحس المستخدم فيه كـ"ثقل"/بلاغ مفاجئ).
++  await eos(ctx, '⏳ جاري الإرسال...', { parse_mode:'Markdown' });
++
+   var caption = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name||'عام')+'  |  📖 '+escMd(f.sub_name||'عام');
+   var kb = build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
+ 
+@@ -318,11 +323,16 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
+   else if (f.file_type==='audio') sendP = ctx.replyWithAudio(f.file_id, { caption, parse_mode:'Markdown', ...kb });
+   else                             sendP = ctx.replyWithDocument(f.file_id, { caption, parse_mode:'Markdown', ...kb });
+ 
+-  // ⚡ 4. حذف القديمة + إرسال الجديدة + سجل بالتوازي — لا انتظار
+-  await Promise.all([
+-    ctx.deleteMessage().catch(function(){}),
+-    sendP.catch(function(e){ ctx.reply('❌ تعذر إرسال الملف.').catch(function(){}); }),
+-  ]);
++  // ⚡ 4. بعد نجاح الإرسال فقط احذف رسالة "⏳" — القديمة توصل تختفي بالضبط وقت
++  // ما يوصل الملف، مو قبله. لو فشل الإرسال، عدّل نفس الرسالة لخطأ بدل ما تعلق بـ⏳
++  try {
++    await sendP;
++    ctx.deleteMessage().catch(function(){});
++  } catch (e) {
++    ctx.editMessageText('❌ تعذر إرسال الملف.', { parse_mode:'Markdown' }).catch(function(){
++      ctx.reply('❌ تعذر إرسال الملف.').catch(function(){});
++    });
++  }
+ 
+   // ⚡ 5. عمليات الخلفية — لا تأخر المستخدم أبداً
+   filesDb.incDownloads(fid);

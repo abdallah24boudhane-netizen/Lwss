@@ -505,21 +505,31 @@ function setupGroupCommands(bot) {
       const n = parseInt((ctx.message.text || '').split(/\s+/)[1]);
       if (!n || n < 1) return ctx.reply("↩️ رد على أول رسالة تريد حذفها، أو اكتب: مسح 50").catch(() => {});
       toId   = ctx.message.message_id - 1;
-      fromId = Math.max(1, toId - Math.min(n, 100) + 1);
+      fromId = Math.max(1, toId - Math.min(n, 1000) + 1);
     }
     if (toId < fromId) return ctx.reply("⚠️ ما في رسائل للحذف").catch(() => {});
     const total = toId - fromId + 1;
-    if (total > 100) return ctx.reply("⚠️ الحد الأقصى 100 رسالة").catch(() => {});
-    const m = await ctx.reply("🗑 جاري حذف " + total + " رسالة...").catch(() => null);
+    if (total > 1000) return ctx.reply("⚠️ الحد الأقصى 1000 رسالة").catch(() => {});
+
+    const ids = [];
+    for (let i = fromId; i <= toId; i++) ids.push(i);
+
     let deleted = 0;
-    for (let i = fromId; i <= toId; i++) {
+    const BATCH = 100; // حد تيليجرام لـ deleteMessages
+    for (let b = 0; b < ids.length; b += BATCH) {
+      const chunk = ids.slice(b, b + BATCH);
       try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, i);
-        deleted++;
-      } catch(_) {}
-      if (deleted % 10 === 0) await new Promise(r => setTimeout(r, 200));
+        await ctx.telegram.deleteMessages(ctx.chat.id, chunk);
+        deleted += chunk.length;
+      } catch(_) {
+        // fallback واحدة واحدة لو الـ batch فشل (رسائل قديمة جداً مثلاً)
+        for (const id of chunk) {
+          try { await ctx.telegram.deleteMessage(ctx.chat.id, id); deleted++; } catch(_) {}
+        }
+      }
+      if (b + BATCH < ids.length) await new Promise(r => setTimeout(r, 150));
     }
-    if (m) await ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {});
+
     const done = await ctx.reply("✅ تم حذف " + deleted + " رسالة").catch(() => null);
     if (done) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, done.message_id).catch(() => {}), 4000);
   };

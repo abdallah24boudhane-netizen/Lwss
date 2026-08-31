@@ -1,0 +1,24 @@
+diff --git a/database/db.js b/database/db.js
+index 1a2b3c4..5d6e7f8 100644
+--- a/database/db.js
++++ b/database/db.js
+@@ -544,6 +544,17 @@ async function initSchema() {
+   try { if(pg) await pg.query('ALTER TABLE bundle_files ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+   try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT NULL'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+   try { if(pg) await pg.query('ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
++
++  // 🔧 FIX: هذي الثلاثة كانت موجودة بس كسكربت منفصل (add_file_size.js) أو تهيئة
++  // كسولة (database/xp.js's ready()، handlers/group_members_panel.js) ما تشتغل
++  // بالضرورة قبل أول استخدام حقيقي — على قاعدة فاضية جديدة هذا يسبب فشل أي
++  // استعادة نسخة احتياطية قديمة (أعمدة/جدول ناقصة).
++  try { if(pg) await pg.query('ALTER TABLE files ADD COLUMN IF NOT EXISTS file_size BIGINT DEFAULT 0'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
++  try { if(pg) await pg.query('ALTER TABLE group_members ADD COLUMN IF NOT EXISTS joined_at TIMESTAMP DEFAULT NOW()'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
++  try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS user_xp (
++    user_id   BIGINT PRIMARY KEY,
++    xp        INTEGER DEFAULT 0,
++    level     INTEGER DEFAULT 1,
++    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
++  )`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+ 
+   logger.info('✅ Schema ready');
+ }
