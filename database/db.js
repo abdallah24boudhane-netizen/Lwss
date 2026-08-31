@@ -554,6 +554,24 @@ async function initSchema() {
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
+  // 🤫 نظام الهمسة (Whisper) — رسائل سرية بين أعضاء نفس القروب
+  try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS whispers (
+    id            SERIAL PRIMARY KEY,
+    chat_id       BIGINT NOT NULL,
+    message_id    BIGINT,
+    sender_id     BIGINT NOT NULL,
+    sender_name   TEXT,
+    receiver_id   BIGINT NOT NULL,
+    receiver_name TEXT,
+    content       TEXT NOT NULL,
+    created_at    TIMESTAMP DEFAULT NOW(),
+    expires_at    TIMESTAMP NOT NULL,
+    opened        SMALLINT DEFAULT 0,
+    opened_at     TIMESTAMP
+  )`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_whispers_expires  ON whispers(expires_at)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_whispers_receiver ON whispers(receiver_id)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+
   logger.info('✅ Schema ready');
 }
 

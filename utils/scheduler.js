@@ -191,6 +191,7 @@ async function cleanup() {
   try { await run("DELETE FROM group_bot_msgs WHERE sent_at < NOW() - INTERVAL '3 days'"); } catch (_) {}
   try { await run("DELETE FROM ai_history WHERE created_at < NOW() - INTERVAL '7 days'"); } catch (_) {}
   try { await run("DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'"); } catch (_) {}
+  try { await require('../handlers/whisper').cleanup(); } catch (_) {} // 🤫 همسات منتهية (بدون setInterval منفصل لكل همسة)
 }
 
 function notifyOwners(text) { for (const oid of _owners) _bot.telegram.sendMessage(oid, text).catch(err => { require('./logger').debug("[silent]", err.message); }); }

@@ -494,6 +494,7 @@ bot.hears(/^.{2,25}$/, async (ctx, next) => {
 
 // 🎮 أكسيو أو فيريتي — تسجيل مبكر (قبل أي middleware قد يبتلع الرسائل)
 require('./handlers/tod').register(bot);
+require('./handlers/whisper').register(bot); // 🤫 نظام الهمسة — نفس سبب التسجيل المبكر
 bot.use(gameAndBankMiddleware);   // الألعاب والبنك قبل auth
 bot.use(authMiddleware);
 bot.use(botAdminCheck);           // FIX: مستوى أعلى — لا nested

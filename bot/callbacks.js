@@ -586,6 +586,16 @@ module.exports.registerCallbacks = function(bot, deps) {
       return;
     }
 
+    // 🤫 نظام الهمسة — نفس نمط todadm: (تفويض مباشر، لا حاجة لـcodec/epoch معقّد)
+    if (_raw.startsWith('whisper:')) {
+      try {
+        return await require('../handlers/whisper').handleOpenCallback(ctx, _raw);
+      } catch (e) {
+        require('../utils/logger').error('[Whisper CB] ' + e.message);
+        return ctx.answerCbQuery('⚠️ خطأ مؤقت.').catch(() => {});
+      }
+    }
+
     const data = cbRes(_raw);
 
     try {
