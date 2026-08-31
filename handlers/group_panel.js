@@ -41,6 +41,15 @@ async function migrateGroupPanel() {
   console.log('[GroupPanel] Migration done');
 }
 
+// تنظيف الأسماء من الزخرفات والرموز الخاصة التي تكسر عرض القائمة
+function cleanTitle(title, fallback) {
+  if (!title) return fallback;
+  // احتفظ بالحروف العربية/اللاتينية/الأرقام/المسافات فقط + إيموجي بسيطة
+  let clean = title.replace(/[\u0300-\u036f\u0653-\u065f\u0670\u06d6-\u06ed]/g, ''); // إزالة التشكيل/الزخرفة
+  clean = clean.replace(/[^\u0621-\u064A\u0660-\u0669a-zA-Z0-9\s\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '').trim();
+  return clean || fallback;
+}
+
 async function showGroupPanel(ctx) {
   // تنظيف سريع — نتحقق من أول 20 قروب فقط لتجنب البطء
   const allG = await all('SELECT chat_id, title FROM group_chats WHERE is_active!=0 ORDER BY title').catch(() => []);
@@ -75,7 +84,7 @@ async function showGroupPanel(ctx) {
     groups.forEach(g => {
       const sp = g.specialty_id ? '🎓' : '📚';
       const w  = g.welcome_enabled ? '✅' : '❌';
-      rows.push([kbBtn(sp + ' ' + (g.title || 'قروب ' + g.chat_id).substring(0,30) + ' ' + w, 'gp_view_' + g.chat_id)]);
+      rows.push([kbBtn(sp + ' ' + cleanTitle(g.title, 'قروب ' + g.chat_id).substring(0,30) + ' ' + w, 'gp_view_' + g.chat_id)]);
     });
     rows.push([kbBtn('🏆 ترتيب القروبات (الأعضاء)', 'gp_leaderboard')]);
   }
@@ -128,7 +137,7 @@ async function showGroupsLeaderboard(ctx, opts = {}) {
   let text = '🏆 *ترتيب القروبات*\n━━━━━━━━━━━━━━━━━━\n\n';
   ranked.forEach((g, i) => {
     const rank = RANK_EMOJI[i] || (i + 1) + '.';
-    const title = (g.title || 'قروب ' + g.chat_id).substring(0, 30);
+    const title = cleanTitle(g.title, 'قروب ' + g.chat_id).substring(0, 30);
     text += rank + ' ' + title + '\n';
     text += '👥 ' + fmtNum(g.count) + ' عضو\n\n';
   });
@@ -188,7 +197,7 @@ async function showGroupDetail(ctx, chatId) {
   const on  = '🟢';
   const off = '🔴';
 
-  let text = '👥 *' + (g.title || 'قروب').substring(0,30) + '*\n';
+  let text = '👥 *' + cleanTitle(g.title, 'قروب').substring(0,30) + '*\n';
   text += '━━━━━━━━━━━━━━━━━━\n\n';
   text += '🆔 `' + chatId + '`\n';
   text += '🎓 التخصص: *' + (spec?.name || 'غير محدد') + '*\n';
