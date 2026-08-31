@@ -705,7 +705,7 @@ async function handleInviteMeList(ctx) {
   const rows = [];
 
   for (const g of groups.slice(0, 20)) {
-    rows.push([{ text: '🔗 ' + String(g.title || g.chat_id).substring(0, 30), callback_data: 'gp_gen_invite_' + g.chat_id }]);
+    rows.push([{ text: '🔗 ' + cleanTitle(g.title, String(g.chat_id)).substring(0, 30), callback_data: 'gp_gen_invite_' + g.chat_id }]);
   }
   rows.push([{ text: '◀️ رجوع', callback_data: 'gp_panel' }]);
 
@@ -732,10 +732,23 @@ async function handleGenInvite(ctx, chatId) {
     }
 
     const g = await all('SELECT title FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => []);
-    const title = g[0]?.title || chat.title || chatId;
+    const title = cleanTitle(g[0]?.title || chat.title, String(chatId));
+
+    // إذا Owner محظور في هذا القروب — فك حظره تلقائياً قبل إرسال الرابط
+    let wasUnbanned = false;
+    try {
+      const meInGroup = await ctx.telegram.getChatMember(chatId, uid).catch(() => null);
+      if (meInGroup?.status === 'kicked') {
+        await ctx.telegram.unbanChatMember(chatId, uid, { only_if_banned: true });
+        wasUnbanned = true;
+      }
+    } catch(_) {}
+
     ctx.answerCbQuery('✅ تم جلب الرابط الحالي').catch(() => {});
     return ctx.reply(
-      '🔗 *رابط دعوة لـ: ' + title + '*\n\n' + link + '\n\n_هذا هو رابط القروب الحالي — يعمل مهما تغيّرت الظروف طالما لم يُبطَل يدوياً_',
+      '🔗 *رابط دعوة لـ: ' + title + '*\n\n' + link +
+      (wasUnbanned ? '\n\n✅ _تم رفع حظرك تلقائياً من هذا القروب_' : '') +
+      '\n\n_هذا هو رابط القروب الحالي — يعمل مهما تغيّرت الظروف طالما لم يُبطَل يدوياً_',
       { parse_mode: 'Markdown' }
     ).catch(() => {});
   } catch(e) {
