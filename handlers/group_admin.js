@@ -78,11 +78,12 @@ async function handleNewMember(bot, chatId, userId, firstName) {
       }
     } catch(_) {}
 
-    const defaultMsg =
+    // الرسالة الأساسية (fallback نهائي) — ID واضح كنص عادي، مو رابط مخفي
+    const hardcodedMsg =
 `🎉 أهلاً وسهلاً بـ *${name}*!
 
 ┌─────────────────────┐
-│ 🆔 [المعرّف: ${userId}](tg://user?id=${userId})
+│ 🆔 المعرّف: \`${userId}\`
 │ 📅 ${date}  🕐 ${time}${specLine}
 │ 👥 العضو رقم: *${memberCount}*
 └─────────────────────┘
@@ -92,17 +93,31 @@ async function handleNewMember(bot, chatId, userId, firstName) {
 🔹 استخدم /help لمعرفة أوامر البوت
 ━━━━━━━━━━━━━━━━━━━━`;
 
-    const customMsg = grp?.welcome_msg
-      ? grp.welcome_msg
+    // الإعدادات الافتراضية العامة التي ضبطها الـ Owner (تُستخدم لو القروب بدون رسالة مخصصة)
+    let ownerDefaultMsg = null, ownerDefaultPhoto = null;
+    if (!grp?.welcome_msg) {
+      try {
+        const defs = await all("SELECT key, value FROM bot_defaults WHERE key IN ('default_welcome_msg','default_welcome_photo')").catch(() => []);
+        defs.forEach(d => {
+          if (d.key === 'default_welcome_msg') ownerDefaultMsg = d.value;
+          if (d.key === 'default_welcome_photo') ownerDefaultPhoto = d.value;
+        });
+      } catch(_) {}
+    }
+    if (ownerDefaultPhoto && !grp?.welcome_photo) grp.welcome_photo = ownerDefaultPhoto;
+
+    const rawTemplate = grp?.welcome_msg || ownerDefaultMsg;
+    const customMsg = rawTemplate
+      ? rawTemplate
           .replace(/{name}/g,    name)
           .replace(/{mention}/g, '[' + name + '](tg://user?id=' + userId + ')')
-          .replace(/{id}/g,      userId)
+          .replace(/{id}/g,      '`' + userId + '`')
           .replace(/{spec}/g,    specName)
           .replace(/{date}/g,    date)
           .replace(/{time}/g,    time)
           .replace(/{count}/g,   memberCount)
           .replace(/{group}/g,   groupTitle)
-      : defaultMsg;
+      : hardcodedMsg;
 
     // أزرار الترحيب
     const welcomeKb = {

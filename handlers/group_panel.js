@@ -94,9 +94,75 @@ async function showGroupPanel(ctx) {
     kbBtn('🎓 رسالة لتخصص', 'gp_broadcast_sp'),
   ]);
   rows.push([kbBtn('📨 أضفني لقروب (رابط دعوة)', 'gp_invite_me_list')]);
+  rows.push([kbBtn('⚙️ الإعدادات الافتراضية للقروبات الجديدة', 'gp_defaults')]);
   rows.push([kbBtn('◀️ رجوع', 'mg_menu')]);
 
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
+}
+
+// ══════════════════════════════════════════════════════════
+// ⚙️ الإعدادات الافتراضية العامة — تُطبَّق على أي قروب جديد
+// ══════════════════════════════════════════════════════════
+async function showDefaultSettings(ctx) {
+  const uid = ctx.uid || ctx.from?.id;
+  if (uid !== parseInt(process.env.OWNER_ID)) return ctx.answerCbQuery('🚫').catch(() => {});
+
+  await run(`CREATE TABLE IF NOT EXISTS bot_defaults (
+    key TEXT PRIMARY KEY, value TEXT
+  )`).catch(() => {});
+
+  const rows = await all('SELECT key, value FROM bot_defaults').catch(() => []);
+  const defs = {};
+  rows.forEach(r => defs[r.key] = r.value);
+
+  const hasMsg = !!defs.default_welcome_msg;
+  const hasPhoto = !!defs.default_welcome_photo;
+
+  const text =
+    '⚙️ *الإعدادات الافتراضية للقروبات الجديدة*\n━━━━━━━━━━━━━━━\n\n' +
+    'هذه الإعدادات تُطبَّق تلقائياً على أي قروب جديد لا يملك رسالة ترحيب مخصصة.\n\n' +
+    '📝 رسالة افتراضية: ' + (hasMsg ? '✅ مضبوطة' : '❌ (يُستخدم النص الأساسي)') + '\n' +
+    '🖼 صورة افتراضية: ' + (hasPhoto ? '✅ مضبوطة' : '❌ بدون صورة') + '\n\n' +
+    '_المتغيرات المتاحة: {name} {mention} {id} {spec} {date} {time} {count} {group}_';
+
+  const kb = [
+    [kbBtn('✏️ تعديل الرسالة الافتراضية', 'gp_def_setmsg')],
+    [kbBtn('🖼 تعديل الصورة الافتراضية', 'gp_def_setphoto')],
+    hasMsg || hasPhoto ? [kbBtn('🗑 إعادة الضبط للنص الأساسي', 'gp_def_reset')] : null,
+    [kbBtn('◀️ رجوع', 'gp_panel')],
+  ].filter(Boolean);
+
+  return ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } })
+    .catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } }).catch(() => {}));
+}
+
+async function handleDefaultCallback(ctx, data) {
+  const uid = ctx.uid || ctx.from?.id;
+  if (uid !== parseInt(process.env.OWNER_ID)) return ctx.answerCbQuery('🚫').catch(() => {});
+
+  if (data === 'gp_def_setmsg') {
+    await require('../utils/stateManager').setState(uid, { type: 'gp_def_msg' });
+    return ctx.reply(
+      '✏️ *أرسل نص الرسالة الافتراضية الجديدة:*\n\n' +
+      '_المتغيرات: {name} {mention} {id} {spec} {date} {time} {count} {group}_\n\n' +
+      '💡 نصيحة: استخدم {mention} بدل {id} داخل رابط — يعطي اسم واضح بدل رقم مغبش.\n\n' +
+      '(أو /cancel للإلغاء)',
+      { parse_mode: 'Markdown' }
+    ).catch(() => {});
+  }
+
+  if (data === 'gp_def_setphoto') {
+    await require('../utils/stateManager').setState(uid, { type: 'gp_def_photo' });
+    return ctx.reply('🖼 أرسل الصورة الافتراضية الجديدة:\n\n(أو /cancel للإلغاء)').catch(() => {});
+  }
+
+  if (data === 'gp_def_reset') {
+    await run('DELETE FROM bot_defaults WHERE key IN ($1,$2)', ['default_welcome_msg', 'default_welcome_photo']).catch(() => {});
+    ctx.answerCbQuery('✅ تمت إعادة الضبط').catch(() => {});
+    return showDefaultSettings(ctx);
+  }
+
+  return false;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -294,6 +360,8 @@ async function showBroadcastSpecPicker(ctx) {
 async function handleCallback(ctx, data) {
   const uid = ctx.uid;
   if (data === 'gp_panel') { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? showGroupPanel(ctx) : showMyGroups(ctx); }
+  if (data === 'gp_defaults') return showDefaultSettings(ctx);
+  if (data === 'gp_def_setmsg' || data === 'gp_def_setphoto' || data === 'gp_def_reset') return handleDefaultCallback(ctx, data);
 
   if (data === 'gp_broadcast_sp') return showBroadcastSpecPicker(ctx);
 
@@ -509,6 +577,21 @@ async function handleText(ctx, text, state) {
       return ctx.reply('تم الارسال!', kbBuild([[kbBtn('◀️ رجوع', 'gp_view_' + state.chatId)]])).catch(() => {});
     } catch (e) { return ctx.reply('فشل: ' + e.message).catch(() => {}); }
   }
+  if (state.type === 'gp_def_msg') {
+    if (text === '/cancel') {
+      await require('../utils/stateManager').delState(ctx.uid);
+      return ctx.reply('❌ تم الإلغاء').catch(() => {});
+    }
+    await run(`CREATE TABLE IF NOT EXISTS bot_defaults (key TEXT PRIMARY KEY, value TEXT)`).catch(() => {});
+    await run(
+      `INSERT INTO bot_defaults(key, value) VALUES('default_welcome_msg', $1)
+       ON CONFLICT(key) DO UPDATE SET value=$1`,
+      [text]
+    ).catch(() => {});
+    await require('../utils/stateManager').delState(ctx.uid);
+    await ctx.reply('✅ *تم حفظ الرسالة الافتراضية!*\n\nستُطبَّق على أي قروب جديد بدون رسالة مخصصة.', { parse_mode: 'Markdown' }).catch(() => {});
+    return showDefaultSettings(ctx);
+  }
 }
 
 async function handleMedia(ctx, state) {
@@ -527,6 +610,21 @@ async function handleMedia(ctx, state) {
     await ctx.reply('✅ تم حفظ صورة الترحيب!').catch(() => {});
     return showGroupDetail(ctx, state.chatId);
   }
+  if (state.type === 'gp_def_photo') {
+    const photo = ctx.message?.photo;
+    const fileId = photo ? photo[photo.length - 1].file_id : null;
+    if (!fileId) return ctx.reply('⚠️ أرسل صورة صحيحة').catch(() => {});
+    await run(`CREATE TABLE IF NOT EXISTS bot_defaults (key TEXT PRIMARY KEY, value TEXT)`).catch(() => {});
+    await run(
+      `INSERT INTO bot_defaults(key, value) VALUES('default_welcome_photo', $1)
+       ON CONFLICT(key) DO UPDATE SET value=$1`,
+      [fileId]
+    ).catch(() => {});
+    await require('../utils/stateManager').delState(ctx.uid);
+    await ctx.reply('✅ *تم حفظ الصورة الافتراضية!*', { parse_mode: 'Markdown' }).catch(() => {});
+    return showDefaultSettings(ctx);
+  }
+
   const msg = ctx.message;
   const caption = msg.caption || '';
 
@@ -779,4 +877,5 @@ module.exports = {
   showMyGroups, showMainMenu, showGroupPanel, showGroupsLeaderboard, cleanDeadGroups,
   handleCallback, handleText, handleMedia, migrateGroupPanel,
   handleInviteMeList, handleGenInvite,
+  showDefaultSettings, handleDefaultCallback,
   showGroupWelcomeSection, showGroupNotifySection, showGroupInfoSection, showGroupPollSection };
