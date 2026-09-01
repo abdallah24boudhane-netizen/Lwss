@@ -124,7 +124,7 @@ function registerComposeHandler(bot) {
     }
 
     const teaserText = '🤫 *همسة سرية*\n\n👤 من: ' + mention(ctx.from.first_name, uid) +
-      '\n👤 إلى: ' + mention(state.targetName, state.targetId);
+      '\n\n_اضغط الزر إذا كانت موجّهة إليك_';
     const kb = build([[btn('🤫 عرض الهمسة', 'whisper:' + whisper.id)]]);
 
     try {
