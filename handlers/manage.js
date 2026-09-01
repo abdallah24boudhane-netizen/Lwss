@@ -247,7 +247,7 @@ async function showUsers(ctx, page=0, filter='all') {
 
   const rows = [filterRow, ...userRows];
   if (navRow.length) rows.push(navRow);
-  rows.push([back('mg_main')[0]]);
+  rows.push([btn('◀️ رجوع', 'mg_menu')]);
 
   return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
 }
