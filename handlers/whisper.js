@@ -1,13 +1,6 @@
 'use strict';
 /**
- * 🤫 handlers/whisper.js — نظام الهمسة (Whisper System) v2
- * ──────────────────────────────────────────────────────────────
- * التدفّق الجديد:
- *   1) رد على رسالة الشخص بالقروب واكتب "همسة" (بدون أي محتوى).
- *   2) البوت يحذف رسالة التريغر فوراً ويرسل لك بالخاص طلب كتابة النص.
- *   3) تكتب نص الهمسة بالخاص — ما يظهر بالقروب إطلاقاً ولا للحظة.
- *   4) يظهر بالقروب تيزر واحد فيه: من ← إلى، وزر "عرض الهمسة".
- * المستلم بس يقدر يفتح الزر ويشوف المحتوى (Alert أو رسالة خاصة لو طويل).
+ * 🤫 handlers/whisper.js — نظام الهمسة v3 (وسائط + mention روابط)
  */
 
 const wdb = require('../database/whisper_db');
@@ -15,7 +8,6 @@ const { escMd } = require('../utils/common');
 const { btn, build } = require('../utils/keyboard');
 
 function isGroup(ctx) { return ['group', 'supergroup'].includes(ctx.chat?.type); }
-
 function delCmd(ctx) { setTimeout(() => ctx.deleteMessage().catch(() => {}), 800); }
 
 function tempReply(ctx, text, delay = 8000) {
@@ -25,7 +17,6 @@ function tempReply(ctx, text, delay = 8000) {
     .catch(() => {});
 }
 
-// ── تحديد الهدف: من الرد (الطريقة الأساسية)، أو @username كـ fallback ──
 async function resolveTarget(ctx) {
   const replyMsg = ctx.message.reply_to_message;
   if (replyMsg?.from) {
@@ -47,18 +38,17 @@ async function resolveTarget(ctx) {
   return null;
 }
 
-// ── الخطوة 1: تريغر "همسة" داخل القروب — يفتح محادثة كتابة بالخاص ──
+function mention(name, id) {
+  return '[' + escMd(name || 'مستخدم') + '](tg://user?id=' + id + ')';
+}
+
 async function handleWhisperCommand(ctx, next) {
   if (!isGroup(ctx)) return next ? next() : undefined;
   delCmd(ctx);
 
   const target = await resolveTarget(ctx);
-  if (!target) {
-    return tempReply(ctx, '❌ رد على رسالة الشخص الذي تريد إرسال همسة له، ثم اكتب: همسة');
-  }
-  if (target.isBot) {
-    return tempReply(ctx, '❌ ما تقدر تبعث همسة لبوت.');
-  }
+  if (!target) return tempReply(ctx, '❌ رد على رسالة الشخص الذي تريد إرسال همسة له، ثم اكتب: همسة');
+  if (target.isBot) return tempReply(ctx, '❌ ما تقدر تبعث همسة لبوت.');
   if (target.id === ctx.from.id) {
     const allowed = await wdb.isSelfAllowed().catch(() => false);
     if (!allowed) return tempReply(ctx, '❌ لا يمكنك إرسال همسة لنفسك.');
@@ -71,11 +61,12 @@ async function handleWhisperCommand(ctx, next) {
   try {
     await ctx.telegram.sendMessage(
       senderId,
-      '🤫 *اكتب رسالة الهمسة التي تريد إرسالها إلى ' + escMd(target.name || 'مستخدم') + ':*\n\n_(أو /cancel للإلغاء)_',
+      '🤫 *اكتب رسالة الهمسة التي تريد إرسالها إلى ' + escMd(target.name || 'مستخدم') + ':*\n\n' +
+      '📎 يمكنك إرسال نص، صورة، فيديو، صوت، أو ستيكر.\n\n_(أو /cancel للإلغاء)_',
       { parse_mode: 'Markdown' }
     );
   } catch (_) {
-    return tempReply(ctx, '⚠️ افتح محادثة خاصة مع البوت أولاً (اضغط على اسمي وابدأ محادثة)، ثم أعد المحاولة.', 10000);
+    return tempReply(ctx, '⚠️ افتح محادثة خاصة مع البوت أولاً، ثم أعد المحاولة.', 10000);
   }
 
   await require('../utils/stateManager').setState(senderId, {
@@ -87,7 +78,6 @@ async function handleWhisperCommand(ctx, next) {
   });
 }
 
-// ── الخطوة 2: استقبال نص الهمسة بالخاص وإرسال التيزر بالقروب ──
 function registerComposeHandler(bot) {
   bot.on('message', async (ctx, next) => {
     if (ctx.chat?.type !== 'private') return next();
@@ -97,13 +87,25 @@ function registerComposeHandler(bot) {
     const state = require('../utils/stateManager').getState(uid);
     if (!state || state.type !== 'whisper_compose') return next();
 
-    const text = (ctx.message.text || ctx.message.caption || '').trim();
-    if (text === '/cancel') {
+    const msg = ctx.message;
+    const rawText = (msg.text || msg.caption || '').trim();
+    if (rawText === '/cancel') {
       await require('../utils/stateManager').delState(uid);
       return ctx.reply('❌ تم إلغاء الهمسة.').catch(() => {});
     }
-    if (!text) {
-      return ctx.reply('⚠️ اكتب نص الهمسة (نص فقط حالياً).').catch(() => {});
+
+    let contentType = 'text', fileId = null, content = '';
+    if (msg.photo) { contentType = 'photo'; fileId = msg.photo[msg.photo.length - 1].file_id; content = msg.caption || ''; }
+    else if (msg.video) { contentType = 'video'; fileId = msg.video.file_id; content = msg.caption || ''; }
+    else if (msg.voice) { contentType = 'voice'; fileId = msg.voice.file_id; content = msg.caption || ''; }
+    else if (msg.video_note) { contentType = 'video_note'; fileId = msg.video_note.file_id; }
+    else if (msg.sticker) { contentType = 'sticker'; fileId = msg.sticker.file_id; }
+    else if (msg.animation) { contentType = 'animation'; fileId = msg.animation.file_id; content = msg.caption || ''; }
+    else if (msg.text) { contentType = 'text'; content = msg.text.trim(); }
+    else return ctx.reply('⚠️ نوع غير مدعوم — أرسل نص، صورة، فيديو، صوت، أو ستيكر.').catch(() => {});
+
+    if (contentType === 'text' && !content) {
+      return ctx.reply('⚠️ اكتب نص الهمسة.').catch(() => {});
     }
 
     await require('../utils/stateManager').delState(uid);
@@ -112,24 +114,17 @@ function registerComposeHandler(bot) {
     let whisper;
     try {
       whisper = await wdb.createWhisper({
-        chatId: state.chatId,
-        senderId: uid,
-        senderName: ctx.from.first_name || '',
-        receiverId: state.targetId,
-        receiverName: state.targetName || '',
-        content: text,
-        ttlMinutes: ttl,
+        chatId: state.chatId, senderId: uid, senderName: ctx.from.first_name || '',
+        receiverId: state.targetId, receiverName: state.targetName || '',
+        content, contentType, fileId, ttlMinutes: ttl,
       });
     } catch (e) {
       require('../utils/logger').error('[Whisper] create failed:', e.message);
       return ctx.reply('⚠️ تعذر إرسال الهمسة، حاول مرة أخرى.').catch(() => {});
     }
 
-    // التيزر بالقروب — يظهر المرسل والمستقبل، بدون سطر المهلة
-    const teaserText =
-      '🤫 *همسة سرية*\n\n' +
-      '👤 من: ' + escMd(ctx.from.first_name || 'مستخدم') + '\n' +
-      '👤 إلى: ' + escMd(state.targetName || 'مستخدم');
+    const teaserText = '🤫 *همسة سرية*\n\n👤 من: ' + mention(ctx.from.first_name, uid) +
+      '\n👤 إلى: ' + mention(state.targetName, state.targetId);
     const kb = build([[btn('🤫 عرض الهمسة', 'whisper:' + whisper.id)]]);
 
     try {
@@ -147,63 +142,56 @@ function registerComposeHandler(bot) {
   });
 }
 
-// ── معالجة زر "عرض الهمسة" ──
 async function handleOpenCallback(ctx, data) {
   const id = parseInt(data.slice('whisper:'.length), 10);
-  if (!Number.isFinite(id)) {
-    return ctx.answerCbQuery('❌ بيانات غير صالحة.', { show_alert: true }).catch(() => {});
-  }
+  if (!Number.isFinite(id)) return ctx.answerCbQuery('❌ بيانات غير صالحة.', { show_alert: true }).catch(() => {});
 
   const w = await wdb.getWhisper(id).catch(() => null);
-  if (!w) {
-    return ctx.answerCbQuery('❌ الهمسة غير موجودة أو تم حذفها.', { show_alert: true }).catch(() => {});
-  }
-  if (String(w.chat_id) !== String(ctx.chat?.id)) {
-    return ctx.answerCbQuery('❌ هذي الهمسة مو من هذا القروب.', { show_alert: true }).catch(() => {});
-  }
-  if (new Date(w.expires_at).getTime() < Date.now()) {
-    return ctx.answerCbQuery('⏳ انتهت صلاحية هذه الهمسة.', { show_alert: true }).catch(() => {});
-  }
-  if (Number(ctx.from.id) !== Number(w.receiver_id)) {
-    return ctx.answerCbQuery('❌ هذه الهمسة ليست موجهة إليك.', { show_alert: true }).catch(() => {});
-  }
+  if (!w) return ctx.answerCbQuery('❌ الهمسة غير موجودة أو تم حذفها.', { show_alert: true }).catch(() => {});
+  if (String(w.chat_id) !== String(ctx.chat?.id)) return ctx.answerCbQuery('❌ هذي الهمسة مو من هذا القروب.', { show_alert: true }).catch(() => {});
+  if (new Date(w.expires_at).getTime() < Date.now()) return ctx.answerCbQuery('⏳ انتهت صلاحية هذه الهمسة.', { show_alert: true }).catch(() => {});
+  if (Number(ctx.from.id) !== Number(w.receiver_id)) return ctx.answerCbQuery('❌ هذه الهمسة ليست موجهة إليك.', { show_alert: true }).catch(() => {});
 
   const openOnce = await wdb.isOpenOnce().catch(() => false);
-  let content = w.content;
-
+  let row = w;
   if (openOnce) {
     const claimed = await wdb.claimSingleOpen(id).catch(() => null);
-    if (!claimed) {
-      return ctx.answerCbQuery('⏳ سبق فتح هذه الهمسة، ما تقدر تفتحها مرة ثانية.', { show_alert: true }).catch(() => {});
-    }
-    content = claimed.content;
+    if (!claimed) return ctx.answerCbQuery('⏳ سبق فتح هذه الهمسة، ما تقدر تفتحها مرة ثانية.', { show_alert: true }).catch(() => {});
+    row = claimed;
   } else {
     await wdb.markOpenedIfFirst(id);
   }
 
-  if (content.length <= 190) {
+  const contentType = row.content_type || 'text';
+  const content = row.content || '';
+  const fileId = row.file_id || null;
+
+  if (contentType === 'text' && content.length <= 190) {
     return ctx.answerCbQuery('🤫 ' + content, { show_alert: true }).catch(() => {});
   }
 
+  const capt = '🤫 *همسة من ' + escMd(w.sender_name || 'مستخدم') + '*' + (content ? ':\n\n' + content : '');
   try {
-    await ctx.telegram.sendMessage(ctx.from.id, '🤫 *همسة من ' + escMd(w.sender_name || 'مستخدم') + ':*\n\n' + content, { parse_mode: 'Markdown' });
+    if (contentType === 'photo') await ctx.telegram.sendPhoto(ctx.from.id, fileId, { caption: capt, parse_mode: 'Markdown' });
+    else if (contentType === 'video') await ctx.telegram.sendVideo(ctx.from.id, fileId, { caption: capt, parse_mode: 'Markdown' });
+    else if (contentType === 'voice') await ctx.telegram.sendVoice(ctx.from.id, fileId, { caption: capt, parse_mode: 'Markdown' });
+    else if (contentType === 'animation') await ctx.telegram.sendAnimation(ctx.from.id, fileId, { caption: capt, parse_mode: 'Markdown' });
+    else if (contentType === 'video_note') { await ctx.telegram.sendMessage(ctx.from.id, capt, { parse_mode: 'Markdown' }); await ctx.telegram.sendVideoNote(ctx.from.id, fileId); }
+    else if (contentType === 'sticker') { await ctx.telegram.sendMessage(ctx.from.id, capt, { parse_mode: 'Markdown' }); await ctx.telegram.sendSticker(ctx.from.id, fileId); }
+    else await ctx.telegram.sendMessage(ctx.from.id, capt, { parse_mode: 'Markdown' });
     return ctx.answerCbQuery('✅ بعثتلك الهمسة بالخاص.').catch(() => {});
   } catch (_) {
     const botUn = ctx.botInfo?.username || '';
-    return ctx.answerCbQuery(
-      '🤫 ' + content.slice(0, 150) + '…\n\n(الرسالة طويلة — ابدأ محادثة خاصة مع @' + botUn + ' لعرضها كاملة)',
-      { show_alert: true }
-    ).catch(() => {});
+    return ctx.answerCbQuery('🤫 الهمسة تحتوي محتوى — ابدأ محادثة خاصة مع @' + botUn + ' أولاً ثم أعد فتحها.', { show_alert: true }).catch(() => {});
   }
 }
 
-// ── أوامر إعداد (owner فقط) ──
 function registerSettingsCommands(bot) {
   bot.command('whisperonce', async ctx => {
     if (!ctx.isOwner) return;
     const cur = await wdb.isOpenOnce();
     await wdb.setOpenOnce(!cur);
-    return ctx.reply(!cur ? '✅ الهمسة صارت تُفتح مرة وحدة بس.' : '✅ الهمسة صارت تُفتح أكثر من مرة (لين الانتهاء).').catch(() => {});
+    return ctx.reply(!cur ? '✅ الهمسة صارت تُفتح مرة وحدة بس.' : '✅ الهمسة صارت تُفتح أكثر من مرة.').catch(() => {});
   });
   bot.command('whisperself', async ctx => {
     if (!ctx.isOwner) return;
@@ -216,7 +204,7 @@ function registerSettingsCommands(bot) {
     const n = parseInt((ctx.message.text || '').split(/\s+/)[1], 10);
     if (!Number.isFinite(n) || n <= 0) {
       const cur = await wdb.getTtlMinutes();
-      return ctx.reply('⏳ المدة الحالية: ' + cur + ' دقيقة (داخلية فقط — ما تظهر للمستخدمين).\n\nلتغييرها: `/whisperttl 15`', { parse_mode: 'Markdown' }).catch(() => {});
+      return ctx.reply('⏳ المدة الحالية: ' + cur + ' دقيقة (داخلية فقط).\n\nلتغييرها: `/whisperttl 15`', { parse_mode: 'Markdown' }).catch(() => {});
     }
     await wdb.setTtlMinutes(n);
     return ctx.reply('✅ صارت مدة صلاحية الهمسة ' + n + ' دقيقة.').catch(() => {});
@@ -229,8 +217,4 @@ function register(bot) {
   registerSettingsCommands(bot);
 }
 
-module.exports = {
-  register,
-  handleOpenCallback,
-  cleanup: wdb.cleanupExpired,
-};
+module.exports = { register, handleOpenCallback, cleanup: wdb.cleanupExpired };

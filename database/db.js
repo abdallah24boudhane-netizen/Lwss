@@ -571,6 +571,8 @@ async function initSchema() {
   )`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_whispers_expires  ON whispers(expires_at)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_whispers_receiver ON whispers(receiver_id)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE whispers ADD COLUMN IF NOT EXISTS content_type TEXT DEFAULT \'text\''); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE whispers ADD COLUMN IF NOT EXISTS file_id TEXT'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
   logger.info('✅ Schema ready');
 }
