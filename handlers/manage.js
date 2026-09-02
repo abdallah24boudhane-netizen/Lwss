@@ -802,6 +802,8 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         await ctx.telegram.sendVideo(targetId, msg.video.file_id, { caption: msg.caption || '' });
       } else if (msg.sticker) {
         await ctx.telegram.sendSticker(targetId, msg.sticker.file_id);
+      } else if (msg.voice) {
+        await ctx.telegram.sendVoice(targetId, msg.voice.file_id);
       } else if (msg.document) {
         await ctx.telegram.sendDocument(targetId, msg.document.file_id, { caption: msg.caption || '' });
       } else if (text) {

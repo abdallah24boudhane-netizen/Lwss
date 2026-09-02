@@ -37,6 +37,19 @@ module.exports.registerMessages = function(bot, deps) {
     const _mid = ctx.message?.message_id + '_' + (ctx.from?.id || '');
     if (isDupMsg(_mid)) return;
 
+    // 🔧 FIX: حالة "💬 تواصل مع المستخدم" (admin_contact) منطقها جاهز وكامل
+    // بـ manage.handleText (نص/صورة/فيديو/ستيكر/مستند) — بس كانت تُستدعى بس من
+    // داخل bot.on('text')، فأي رسالة مو نصية (صورة/فيديو/صوت/ستيكر) ما توصلها
+    // إطلاقاً. هذا الفحص هنا (على مستوى bot.on('message') العام، يغطي كل الأنواع)
+    // يسد الفجوة بدون ما يمس أي state تاني (كل الفحوصات التانية مقيّدة بنوعها).
+    if (ctx.chat?.type === 'private') {
+      const _acState = require('../utils/stateManager').getState(ctx.uid);
+      if (_acState?.type === 'admin_contact') {
+        await manage.handleText(ctx, _acState);
+        return;
+      }
+    }
+
     if (ctx.chat?.type === 'private' && ctx.from?.id === OWNER_ID && ctx.message?.text?.startsWith('!'))
       return ownerH.handle(ctx, ctx.message.text);
 
