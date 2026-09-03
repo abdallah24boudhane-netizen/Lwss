@@ -47,43 +47,112 @@ async function mainMenu(ctx){
     '━━━━━━━━━━━━━━━━━━━━\n\n' +
     '📚 التخصصات: *'+specs0.length+'*\n' +
     '📁 الملفات: *'+files0+'*\n' +
-    '🔧 الصيانة: *'+(global.maintenanceMode?'🔴 مفعّل':'🟢 متوقف')+'*';
+    '🔧 الصيانة: *'+(global.maintenanceMode?'🔴 مفعّل':' 🟢 متوقف')+'*';
 
   const rows = [];
-
-  // ── المحتوى والإحصائيات ──
-  rows.push([btn('📂 المحتوى','mg_content'), btn('📊 الإحصائيات','mg_analytics')]);
-  rows.push([btn('📜 السجلات','mg_logs'), btn('🗑 المحذوفات','mg_trash')]);
+  rows.push([btn('📁 المحتوى','mg_cat_content')]);
 
   if(isOwner(ctx.uid)){
-    // ── المستخدمون ──
-    rows.push([btn('👥 المستخدمون','mg_users'), btn('👑 الإداريون','mg_admins')]);
-
-    // ── القروبات ──
-    rows.push([btn('👥 القروبات','grp_main')]);
-
-    // ── البث والإشعارات ──
-    rows.push([btn('📢 بث للكل','mg_broadcast'), btn('🔔 إشعار','mg_notify')]);
-    rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp'), btn('📨 الرسائل','mg_msgs')]);
-
-    // ── الألعاب والبنك ──
-    rows.push([btn('🎮 الألعاب','mb_panel'), btn('🏦 Taline Bank','mg_pro_bank_panel')]);
-
-    // ── الردود والقنوات ──
-    rows.push([btn('🤖 الردود التلقائية','mg_auto_replies'), btn('📢 القنوات','mg_channels_menu')]);
-
-    // ── النظام ──
-    rows.push([btn('💾 نسخ احتياطي','mg_backup'), btn('♻️ استعادة','mg_restore')]);
-    rows.push([btn(global.maintenanceMode?'🟢 إيقاف الصيانة':'🔴 الصيانة','mg_maint'), btn('🚩 البلاغات','mg_reports')]);
-
-    if(process.env.CHANNEL_ID) rows.push([btn('📢 نشر في القناة','mg_post_channel')]);
-
-    const appVisible = global._appPublic || false;
-    rows.push([btn('📱 Mini App','mg_open_app'), btn(appVisible?'👁 ظاهر':'🔒 مخفي','mg_toggle_app')]);
+    rows.push([btn('👥 الإدارة','mg_cat_admin')]);
+    rows.push([btn('📊 الإحصائيات والسجلات','mg_cat_stats')]);
+    rows.push([btn('📣 الإشعارات والرسائل','mg_cat_notify')]);
+    rows.push([btn('🤖 الأدوات','mg_cat_tools')]);
+    rows.push([btn('🛠️ النظام','mg_cat_system')]);
+  } else {
+    rows.push([btn('📊 الإحصائيات','mg_analytics'), btn('📜 السجلات','mg_logs')]);
   }
 
-  rows.push([btn('⚙️ إعدادات البوت','mg_bot_settings')]);
   rows.push([btn('🏠 القائمة الرئيسية','main_menu')]);
+  return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
+}
+
+// ══════════════════════════════════════════
+// 📁 قسم المحتوى — تجميع
+// ══════════════════════════════════════════
+async function catContent(ctx){
+  const text = '📁 *المحتوى*\n━━━━━━━━━━━━━━━━━━━━';
+  const rows = [
+    [btn('📂 المحتوى','mg_content'), btn('🗑 المحذوفات','mg_trash')],
+  ];
+  if(isOwner(ctx.uid)){
+    rows.push([btn('📢 القنوات','mg_channels_menu'), btn('🎓 إشعار لتخصص','mg_notify_sp')]);
+  }
+  rows.push([btn('◀️ رجوع','mg_menu')]);
+  return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
+}
+
+// ══════════════════════════════════════════
+// 👥 قسم الإدارة — تجميع
+// ══════════════════════════════════════════
+async function catAdmin(ctx){
+  if(!isOwner(ctx.uid)) return ctx.answerCbQuery('🚫',{show_alert:true}).catch(()=>{});
+  const text = '👥 *الإدارة*\n━━━━━━━━━━━━━━━━━━━━';
+  const rows = [
+    [btn('👑 الإداريون','mg_admins'), btn('👥 المستخدمون','mg_users')],
+    [btn('👥 القروبات','grp_main')],
+    [btn('🚩 البلاغات','mg_reports')],
+    [btn('◀️ رجوع','mg_menu')],
+  ];
+  return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
+}
+
+// ══════════════════════════════════════════
+// 📊 قسم الإحصائيات والسجلات — تجميع
+// ══════════════════════════════════════════
+async function catStats(ctx){
+  if(!isOwner(ctx.uid)) return ctx.answerCbQuery('🚫',{show_alert:true}).catch(()=>{});
+  const text = '📊 *الإحصائيات والسجلات*\n━━━━━━━━━━━━━━━━━━━━';
+  const rows = [
+    [btn('📊 الإحصائيات','mg_analytics'), btn('📜 السجلات','mg_logs')],
+    [btn('🗑 المحذوفات','mg_trash')],
+    [btn('◀️ رجوع','mg_menu')],
+  ];
+  return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
+}
+
+// ══════════════════════════════════════════
+// 📣 قسم الإشعارات والرسائل — تجميع
+// ══════════════════════════════════════════
+async function catNotify(ctx){
+  if(!isOwner(ctx.uid)) return ctx.answerCbQuery('🚫',{show_alert:true}).catch(()=>{});
+  const text = '📣 *الإشعارات والرسائل*\n━━━━━━━━━━━━━━━━━━━━';
+  const rows = [
+    [btn('🔔 إشعار','mg_notify'), btn('📢 بث للكل','mg_broadcast')],
+    [btn('🎓 إشعار لتخصص','mg_notify_sp'), btn('📨 الرسائل','mg_msgs')],
+    [btn('◀️ رجوع','mg_menu')],
+  ];
+  return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
+}
+
+// ══════════════════════════════════════════
+// 🤖 قسم الأدوات — تجميع
+// ══════════════════════════════════════════
+async function catTools(ctx){
+  if(!isOwner(ctx.uid)) return ctx.answerCbQuery('🚫',{show_alert:true}).catch(()=>{});
+  const appVisible = global._appPublic || false;
+  const text = '🤖 *الأدوات*\n━━━━━━━━━━━━━━━━━━━━';
+  const rows = [
+    [btn('🎮 الألعاب','mb_panel'), btn('🏦 Taline Bank','mg_pro_bank_panel')],
+    [btn('🤖 الردود التلقائية','mg_auto_replies')],
+    [btn('📱 Mini App','mg_open_app'), btn(appVisible?'👁 ظاهر':'🔒 مخفي','mg_toggle_app')],
+    [btn('◀️ رجوع','mg_menu')],
+  ];
+  return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
+}
+
+// ══════════════════════════════════════════
+// 🛠️ قسم النظام — تجميع
+// ══════════════════════════════════════════
+async function catSystem(ctx){
+  if(!isOwner(ctx.uid)) return ctx.answerCbQuery('🚫',{show_alert:true}).catch(()=>{});
+  const text = '🛠️ *النظام*\n━━━━━━━━━━━━━━━━━━━━\n\n🔧 الصيانة: *'+(global.maintenanceMode?'🔴 مفعّل':' 🟢 متوقف')+'*';
+  const rows = [
+    [btn('💾 نسخ احتياطي','mg_backup'), btn('♻️ استعادة','mg_restore')],
+    [btn(global.maintenanceMode?'🟢 إيقاف الصيانة':'🔴 الصيانة','mg_maint')],
+    [btn('⚙️ إعدادات البوت','mg_bot_settings')],
+  ];
+  if(process.env.CHANNEL_ID) rows.push([btn('📢 نشر في القناة','mg_post_channel')]);
+  rows.push([btn('◀️ رجوع','mg_menu')]);
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
 
