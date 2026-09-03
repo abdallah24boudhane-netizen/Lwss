@@ -185,6 +185,11 @@ async function runRoundLoop(session) {
     const info = {};
     state.nextEpoch(session);
     const cardMsg = await safeSend(session.chatId, roundCardText(session, asker, answerer, info), { reply_markup: kb.choiceKeyboard(session) });
+    if (!cardMsg) {
+      logger.warn('[ToD] تعذّر الإرسال للقروب — إنهاء الجلسة: ' + session.chatId);
+      await endSession(session, 'تعذّر إرسال رسائل لهذا القروب (البوت رُبما أُزيل منه).');
+      return;
+    }
     const cardId = cardMsg?.message_id;
 
     async function updateCard(removeKb) {
