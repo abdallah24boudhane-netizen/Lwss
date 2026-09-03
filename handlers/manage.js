@@ -1774,4 +1774,4 @@ async function catSystem(ctx){
   ])});
 }
 
-module.exports={showAutoReplyDetail,mainMenu,catStats,catUsers,catAdmin,catFun,catSystem,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};
+module.exports={showAutoReplyDetail,mainMenu,catStats,catUsers,catAdmin,catFun,catSystem,catContent,catNotify,catTools,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};
