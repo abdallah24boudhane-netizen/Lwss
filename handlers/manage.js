@@ -50,15 +50,13 @@ async function mainMenu(ctx){
     '🔧 الصيانة: *'+(global.maintenanceMode?'🔴 مفعّل':' 🟢 متوقف')+'*';
 
   const rows = [];
-  rows.push([btn('📁 المحتوى','mg_cat_content')]);
 
   if(isOwner(ctx.uid)){
-    rows.push([btn('👥 الإدارة','mg_cat_admin')]);
-    rows.push([btn('📊 الإحصائيات والسجلات','mg_cat_stats')]);
-    rows.push([btn('📣 الإشعارات والرسائل','mg_cat_notify')]);
-    rows.push([btn('🤖 الأدوات','mg_cat_tools')]);
-    rows.push([btn('🛠️ النظام','mg_cat_system')]);
+    rows.push([btn('📁 المحتوى','mg_cat_content'), btn('👥 الإدارة','mg_cat_admin')]);
+    rows.push([btn('📊 الإحصائيات والسجلات','mg_cat_stats'), btn('📣 الإشعارات والرسائل','mg_cat_notify')]);
+    rows.push([btn('🤖 الأدوات','mg_cat_tools'), btn('🛠️ النظام','mg_cat_system')]);
   } else {
+    rows.push([btn('📁 المحتوى','mg_cat_content')]);
     rows.push([btn('📊 الإحصائيات','mg_analytics'), btn('📜 السجلات','mg_logs')]);
   }
 
