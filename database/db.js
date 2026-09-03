@@ -704,6 +704,82 @@ module.exports = {
 // هذا السطر ما يضاف هنا — شغّل الكومند التالي مباشرة على DB
 
 // ── Migration: جداول البنك ──
+async function runEconomyMigration() {
+  if (!pg) return;
+  try {
+    const already = await getSetting('economy_migrated_v1');
+    if (already) return;
+    console.log('[EconomyMigration] 🔄 بدء توحيد الأنظمة البنكية (bank_accounts → pro_bank_accounts)...');
+
+    await pg.query(`CREATE TABLE IF NOT EXISTS legacy_bank_migration_map (
+      old_user_id BIGINT PRIMARY KEY,
+      migrated_amount NUMERIC NOT NULL,
+      migrated_at TIMESTAMP DEFAULT NOW()
+    )`);
+
+    const beforeOld = await pg.query('SELECT COALESCE(SUM(balance),0) as s FROM bank_accounts');
+    const beforePro = await pg.query('SELECT COALESCE(SUM(balance),0) as s FROM pro_bank_accounts');
+    const sumBefore = Number(beforeOld.rows[0].s) + Number(beforePro.rows[0].s);
+
+    const client = await pg.connect();
+    let migratedCount = 0;
+    try {
+      await client.query('BEGIN');
+      const oldAccounts = await client.query('SELECT * FROM bank_accounts');
+      for (const acc of oldAccounts.rows) {
+        const bal = Number(acc.balance || 0);
+        const existing = await client.query('SELECT balance FROM pro_bank_accounts WHERE user_id=$1', [acc.user_id]);
+        if (existing.rows.length) {
+          if (bal !== 0) {
+            await client.query('UPDATE pro_bank_accounts SET balance = balance + $1 WHERE user_id=$2', [bal, acc.user_id]);
+          }
+        } else {
+          const iban = 'TAL' + String(acc.user_id).padStart(10, '0') + Math.floor(Math.random() * 90 + 10);
+          await client.query(
+            `INSERT INTO pro_bank_accounts(user_id, first_name, username, balance, card_type, account_type, iban)
+             VALUES ($1,$2,$3,$4,'classic','current',$5)`,
+            [acc.user_id, acc.first_name || '', acc.username || '', bal, iban]
+          );
+        }
+        await client.query(
+          'INSERT INTO legacy_bank_migration_map(old_user_id, migrated_amount) VALUES($1,$2) ON CONFLICT(old_user_id) DO NOTHING',
+          [acc.user_id, bal]
+        );
+        migratedCount++;
+      }
+
+      const oldTxs = await client.query('SELECT * FROM bank_transactions ORDER BY id');
+      for (const tx of oldTxs.rows) {
+        await client.query(
+          `INSERT INTO pro_bank_transactions(from_id, to_id, amount, fee, type, note, created_at)
+           VALUES($1,$2,$3,0,$4,$5,$6)`,
+          [tx.from_id, tx.to_id, tx.amount, 'legacy_' + (tx.type || 'unknown'), tx.note || '', tx.created_at]
+        );
+      }
+
+      await client.query('COMMIT');
+
+      const afterPro = await pg.query('SELECT COALESCE(SUM(balance),0) as s FROM pro_bank_accounts');
+      const sumAfter = Number(afterPro.rows[0].s);
+      const diff = Math.abs(sumAfter - sumBefore);
+      if (diff > 0.01) {
+        console.error('[EconomyMigration] ⚠️ فرق فـ التحقق: ' + diff + ' — الترحيل ما تفعّلش، راجع legacy_bank_migration_map يدوياً.');
+        return;
+      }
+
+      await setSetting('economy_migrated_v1', '1');
+      console.log('[EconomyMigration] ✅ نجح — ' + migratedCount + ' حساب مدموج، ' + oldTxs.rows.length + ' معاملة مؤرشفة، المجموع متطابق (' + sumAfter + ' DA).');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      console.error('[EconomyMigration] ❌ فشل، تم التراجع: ' + e.message);
+    } finally {
+      client.release();
+    }
+  } catch (e) {
+    console.error('[EconomyMigration] ❌ خطأ عام: ' + e.message);
+  }
+}
+
 async function initBankTables() {
   const pg = getPg();
   if (!pg) return;
@@ -720,6 +796,8 @@ async function initBankTables() {
     await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_investments (id SERIAL PRIMARY KEY, user_id BIGINT NOT NULL, amount NUMERIC NOT NULL, daily_rate NUMERIC NOT NULL, tier TEXT DEFAULT 'أساسي', active INTEGER DEFAULT 1, profit_earned NUMERIC DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
     console.log('[BankPro] ✅ Tables ready');
     console.log('[Bank] ✅ Tables ready');
+
+    await runEconomyMigration();
 
     // ── Group Pro tables (احتياط مضمون التنفيذ) ──
     await pg.query(`CREATE TABLE IF NOT EXISTS grp_settings (
@@ -765,3 +843,4 @@ async function initBankTables() {
   } catch(e) { console.error('[Bank]', e.message); }
 }
 module.exports.initBankTables = initBankTables;
+module.exports.runEconomyMigration = runEconomyMigration;
