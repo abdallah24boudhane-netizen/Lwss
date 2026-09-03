@@ -705,6 +705,7 @@ module.exports = {
 
 // ── Migration: جداول البنك ──
 async function runEconomyMigration() {
+  const pg = getPg();
   if (!pg) return;
   try {
     const already = await getSetting('economy_migrated_v1');
