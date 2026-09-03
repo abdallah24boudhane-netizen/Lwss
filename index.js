@@ -624,6 +624,8 @@ async function launch() {
       logger.info('⚡ Preloaded ban status: ' + (banned.length + active.length) + ' users');
     } catch(_) {}
 
+    music.checkDependencies().catch(() => {}); // فحص yt-dlp/ffmpeg مبكراً — يظهر في اللوغز فوراً إن كانا مفقودين
+
     startScheduler(bot, [OWNER_ID]);
     GrpBuf.start();
     require('./handlers/group_verify').startVerifyWatcher(bot);

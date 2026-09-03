@@ -1690,7 +1690,8 @@ module.exports.registerCallbacks = function(bot, deps) {
   }
 
   if (data === 'music_close' || data.startsWith('music_dl_') || data.startsWith('music_track_')) {
-    return require('../handlers/music').handleCallback(ctx).catch(() => {});
+    return require('../handlers/music').handleCallback(ctx)
+      .catch(e => require('../utils/logger').error('[Music callback] unexpected error:', e.message));
   }
 
   });

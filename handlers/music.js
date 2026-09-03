@@ -1,22 +1,20 @@
 'use strict';
-/**
- * ════════════════════════════════════════════
- *  🎵 handlers/music.js — Music Search + Download
- *  Deezer للبحث + yt-dlp للتحميل الكامل
- * ════════════════════════════════════════════
- */
 const { execFile } = require('child_process');
 const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
+const logger = require('../utils/logger');
 
 const DEEZER_SEARCH = q =>
   `https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=8`;
 
-const YTDLP_PATH = process.env.YTDLP_PATH || 'yt-dlp';
+const YTDLP_PATH  = process.env.YTDLP_PATH  || 'yt-dlp';
+const FFMPEG_PATH = process.env.FFMPEG_PATH || 'ffmpeg';
+const COOKIES_FILE = process.env.YTDLP_COOKIES_FILE || '';
 const TMP_DIR    = os.tmpdir();
 const MAX_SIZE   = 45 * 1024 * 1024;
 const DL_TIMEOUT = 90_000;
+const MAX_CANDIDATES = 2;
 
 const fmtDur = s => s ? `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}` : '';
 const escMd  = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
@@ -26,6 +24,34 @@ async function apiGet(url) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+let _depsCache = null;
+
+function _probe(bin, versionFlag) {
+  return new Promise(resolve => {
+    execFile(bin, [versionFlag], { timeout: 5000 }, (err) => resolve(!err));
+  });
+}
+
+async function checkDependencies(force = false) {
+  if (_depsCache && !force) return _depsCache;
+  const [ytOk, ffOk] = await Promise.all([
+    _probe(YTDLP_PATH, '--version'),
+    _probe(FFMPEG_PATH, '-version'),
+  ]);
+  _depsCache = { ytdlp: ytOk, ffmpeg: ffOk };
+  if (!ytOk) {
+    logger.error('[Music] DEPENDENCY MISSING: yt-dlp not found/executable (path:', YTDLP_PATH,
+      '). Music downloads will fail for every song until this is installed.');
+  }
+  if (!ffOk) {
+    logger.error('[Music] DEPENDENCY MISSING: ffmpeg not found/executable (path:', FFMPEG_PATH,
+      '). Audio extraction will fail for every song until this is installed.');
+  }
+  if (ytOk && ffOk) logger.info('[Music] dependency check OK: yt-dlp and ffmpeg are available.');
+  return _depsCache;
+}
+exports.checkDependencies = checkDependencies;
 
 function ytSearch(query) {
   return new Promise((resolve, reject) => {
@@ -44,19 +70,42 @@ function ytSearch(query) {
   });
 }
 
-function ytDownload(videoId, outBase) {
+const BOT_CHECK_RE = /sign in to confirm|not a bot|confirm you.?re not a bot/i;
+
+function ytDownload(videoId, outBase, playerClient) {
   return new Promise((resolve, reject) => {
-    execFile(YTDLP_PATH, [
+    const args = [
       `https://www.youtube.com/watch?v=${videoId}`,
       '-x', '--audio-format', 'mp3',
       '--audio-quality', '5',
       '-o', outBase,
       '--no-playlist', '--quiet', '--no-warnings',
       '--max-filesize', '45m',
-    ], { timeout: DL_TIMEOUT }, (err) => {
-      if (err) return reject(err);
+    ];
+    if (FFMPEG_PATH !== 'ffmpeg') args.push('--ffmpeg-location', FFMPEG_PATH);
+    if (COOKIES_FILE) args.push('--cookies', COOKIES_FILE);
+    if (playerClient) args.push('--extractor-args', `youtube:player_client=${playerClient}`);
+
+    execFile(YTDLP_PATH, args, { timeout: DL_TIMEOUT }, (err, _stdout, stderr) => {
+      if (err) {
+        err.ytStderr  = (stderr || '').split('\n').filter(Boolean).slice(-3).join(' | ');
+        err.isBotCheck = BOT_CHECK_RE.test(stderr || '');
+        return reject(err);
+      }
       resolve(outBase + '.mp3');
     });
+  });
+}
+
+function cleanupTmpPrefix(tmpBase) {
+  if (!tmpBase) return;
+  const dir = path.dirname(tmpBase);
+  const prefix = path.basename(tmpBase);
+  fs.readdir(dir, (err, files) => {
+    if (err) return;
+    for (const f of files) {
+      if (f.startsWith(prefix)) fs.unlink(path.join(dir, f), () => {});
+    }
   });
 }
 
@@ -65,7 +114,16 @@ function encodeTitle(s) {
 }
 
 function buildResultsMsg(tracks, query) {
-  return `🎵 *نتائج البحث عن:* _${escMd(query)}_\n━━━━━━━━━━━━━━━━━━\n\n_اضغط على أغنية بالأسفل لتحميلها كاملاً_ 🎶`;
+  let text = `🎵 *نتائج البحث عن:* _${escMd(query)}_\n━━━━━━━━━━━━━━━━━━\n\n`;
+  tracks.forEach((t, i) => {
+    const dur = fmtDur(t.duration);
+    text += `${i+1}. 🎵 *${escMd(t.title)}*\n`;
+    text += `   👤 ${escMd(t.artist?.name || '?')}`;
+    if (dur) text += `  ⏱ ${dur}`;
+    text += '\n';
+  });
+  text += '\n_اضغط على أغنية لتحميلها كاملاً_ 🎶';
+  return text;
 }
 
 function buildResultsKb(tracks) {
@@ -117,7 +175,7 @@ exports.handleSearch = async (ctx) => {
     }).catch(()=>{});
 
   } catch(e) {
-    console.error('[Music] Search error:', e.message);
+    logger.error('[Music] Search error:', e.message);
     if (loading) ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id).catch(()=>{});
     return ctx.reply('❌ فشل البحث: ' + e.message).catch(()=>{});
   }
@@ -139,25 +197,73 @@ exports.handleCallback = async (ctx) => {
 
     await ctx.answerCbQuery('⏳ جارٍ التحميل...').catch(()=>{});
 
+    const deps = await checkDependencies();
+    if (!deps.ytdlp || !deps.ffmpeg) {
+      const missing = [!deps.ytdlp && 'yt-dlp', !deps.ffmpeg && 'ffmpeg'].filter(Boolean).join(', ');
+      logger.error('[Music] Aborting download — missing dependency:', missing);
+      return ctx.reply(
+        `⚠️ ميزة تحميل الأغاني غير مهيأة حالياً على الخادم (مكوّن مفقود: ${missing}).\nتم إبلاغ الفريق التقني.`
+      ).catch(()=>{});
+    }
+
     const loading = await ctx.reply(
       `⬇️ جارٍ تحميل *${escMd(title)}*...\n_قد يستغرق حتى دقيقة_`,
       { parse_mode:'Markdown' }
     ).catch(()=>null);
 
-    let outFile = null;
+    let outFile  = null;
+    let tmpBase  = null;
+    let ydur     = null;
+    let lastErr  = null;
+
     try {
       const ytResults = await ytSearch(`${title} ${artist} audio`.trim());
       if (!ytResults.length) throw new Error('لا نتائج على YouTube');
 
-      const videoId = ytResults[0].id;
-      const ydur    = ytResults[0].duration;
+      for (const cand of ytResults.slice(0, MAX_CANDIDATES)) {
+        tmpBase = path.join(TMP_DIR, `music_${Date.now()}_${cand.id}`);
+        let candFile = null;
+        for (const client of [null, 'android']) {
+          try {
+            candFile = await ytDownload(cand.id, tmpBase, client);
+            break;
+          } catch (e) {
+            lastErr = e;
+            logger.error('[Music] download attempt failed:', {
+              videoId: cand.id,
+              client: client || 'default',
+              code: e.code || null,
+              botCheck: !!e.isBotCheck,
+              message: e.message,
+              ytStderr: e.ytStderr || undefined,
+            });
+            cleanupTmpPrefix(tmpBase);
+            if (!e.isBotCheck) break;
+          }
+        }
+        if (!candFile) continue;
+        try {
+          if (!fs.existsSync(candFile)) throw new Error('الملف لم يُنشأ');
+          const size = fs.statSync(candFile).size;
+          if (size > MAX_SIZE) {
+            fs.unlink(candFile, ()=>{});
+            throw new Error(`الملف كبير جداً (${Math.round(size/1024/1024)}MB)`);
+          }
+          outFile = candFile;
+          ydur    = cand.duration;
+          lastErr = null;
+          break;
+        } catch (e) {
+          lastErr = e;
+          logger.error('[Music] post-download validation failed:', { videoId: cand.id, message: e.message });
+          cleanupTmpPrefix(tmpBase);
+        }
+      }
 
-      const tmpBase = path.join(TMP_DIR, `music_${Date.now()}_${videoId}`);
-      outFile = await ytDownload(videoId, tmpBase);
-
-      if (!fs.existsSync(outFile)) throw new Error('الملف لم يُنشأ');
-      const size = fs.statSync(outFile).size;
-      if (size > MAX_SIZE) throw new Error(`الملف كبير جداً (${Math.round(size/1024/1024)}MB)`);
+      if (!outFile) {
+        if (lastErr && lastErr.code === 'ENOENT') await checkDependencies(true);
+        throw lastErr || new Error('فشل كل محاولات التحميل');
+      }
 
       if (loading) ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id).catch(()=>{});
 
@@ -185,7 +291,8 @@ exports.handleCallback = async (ctx) => {
       );
 
     } catch(e) {
-      require('../utils/logger').error('[Music DL] ' + (e.message || e) + (e.stderr ? ' | stderr: ' + String(e.stderr).slice(0,300) : ''));
+      logger.error('[Music] Download failed for', JSON.stringify(title), '-', e.message,
+        e.code ? `(code: ${e.code})` : '', e.ytStderr ? `stderr: ${e.ytStderr}` : '');
       if (loading) ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id).catch(()=>{});
       const msg = e.message?.includes('كبير') ? `❌ ${e.message}` :
                   e.message?.includes('YouTube') ? '❌ لم يُعثر على الأغنية في YouTube' :
@@ -193,6 +300,7 @@ exports.handleCallback = async (ctx) => {
       ctx.reply(msg).catch(()=>{});
     } finally {
       if (outFile && fs.existsSync(outFile)) fs.unlink(outFile, ()=>{});
+      cleanupTmpPrefix(tmpBase);
     }
   }
 };

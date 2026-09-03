@@ -2,7 +2,8 @@
 builder = "nixpacks"
 
 [build.nixpacksPlan.phases.setup]
-nixPkgs = ["nodejs_20"]
+# يجب أن تبقى هذه القائمة مطابقة لـ nixpacks.toml.
+nixPkgs = ["nodejs_20", "yt-dlp", "ffmpeg"]
 
 [build.nixpacksPlan.phases.build]
 cmds = ["npm ci --omit=dev"]
