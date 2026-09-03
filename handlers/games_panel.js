@@ -16,7 +16,7 @@ async function showGamesPanel(ctx) {
     '🎲 *صحصح (أكسيو أو فيريتي)* — لعبة جماعية تفاعلية\n\n' +
     '⚙️ اختر لعبة لإدارتها:';
 
-  const slotStats = await get('SELECT COUNT(*) as games, SUM(CASE WHEN amount>0 THEN 1 ELSE 0 END) as wins FROM bank_transactions WHERE type=$1', ['slot_win']).catch(()=>({games:0,wins:0}));
+  const slotStats = await get("SELECT COUNT(*) as games, SUM(CASE WHEN type='slot_win' THEN 1 ELSE 0 END) as wins FROM pro_bank_transactions WHERE type IN ('slot_win','slot_bet')").catch(()=>({games:0,wins:0}));
   const rows = [
     [kbBtn('🎰 إدارة لعبة المليون', 'gp_million_panel')],
     [kbBtn('📸 إدارة لعبة خمن',     'gp_guess_panel')],
@@ -166,7 +166,7 @@ async function handleCallback(ctx, data) {
   if (data === 'gp_slot_top') {
     const { all: dbAll } = require('../database/db');
     const top = await dbAll(
-      "SELECT user_id, first_name, SUM(amount) as total FROM bank_transactions WHERE description LIKE '%سلوت%' AND amount>0 GROUP BY user_id, first_name ORDER BY total DESC LIMIT 10"
+      "SELECT t.to_id as user_id, a.first_name, SUM(t.amount) as total FROM pro_bank_transactions t LEFT JOIN pro_bank_accounts a ON a.user_id=t.to_id WHERE t.type='slot_win' GROUP BY t.to_id, a.first_name ORDER BY total DESC LIMIT 10"
     ).catch(() => []);
     let txt = '🏆 *أفضل لاعبي السلوت*\n━━━━━━━━━━━━━━━━━━━━\n\n';
     if (!top.length) txt += '_لا توجد بيانات بعد_';
@@ -388,7 +388,7 @@ async function showSlotPanel(ctx) {
   const { get: dbGet } = require('../database/db');
   // إحصائيات السلوت
   const stats = await dbGet(
-    "SELECT COUNT(*) as total, SUM(CASE WHEN description LIKE '%ربح%' THEN 1 ELSE 0 END) as wins FROM bank_transactions WHERE description LIKE '%سلوت%'"
+    "SELECT COUNT(*) as total, SUM(CASE WHEN type='slot_win' THEN 1 ELSE 0 END) as wins FROM pro_bank_transactions WHERE type IN ('slot_win','slot_bet')"
   ).catch(() => ({ total: 0, wins: 0 }));
 
   const text =
@@ -420,7 +420,7 @@ async function showSlotPanel(ctx) {
 async function showShopPanel(ctx) {
   const { all: dbAll } = require('../database/db');
   const purchases = await dbAll(
-    "SELECT COUNT(*) as cnt FROM bank_transactions WHERE description LIKE '%متجر%' OR description LIKE '%اشترى%'"
+    "SELECT COUNT(*) as cnt FROM pro_bank_transactions WHERE type IN ('shop_purchase','shop_box')"
   ).catch(() => []);
   const total = purchases[0]?.cnt || 0;
 

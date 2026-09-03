@@ -767,9 +767,10 @@ module.exports.registerCallbacks = function(bot, deps) {
         if (ctx.from.id !== uid2) return ctx.answerCbQuery('🚫 هذه ليست لعبتك!', { show_alert: true }).catch(() => {});
         const { get: dbGet, run: dbRun } = require('../database/db');
         const BET = 50;
-        const acc = await dbGet('SELECT balance FROM bank_accounts WHERE user_id=$1', [uid2]).catch(() => null);
-        if (!acc || parseFloat(acc.balance) < BET) return ctx.answerCbQuery('❌ رصيدك غير كافٍ! (' + BET + ' دج)', { show_alert: true }).catch(() => {});
-        await dbRun('UPDATE bank_accounts SET balance=balance-$1 WHERE user_id=$2', [BET, uid2]).catch(() => {});
+        const acc = await dbGet('SELECT balance FROM pro_bank_accounts WHERE user_id=$1', [uid2]).catch(() => null);
+        if (!acc || parseFloat(acc.balance) < BET) return ctx.answerCbQuery('❌ رصيدك غير كافٍ! (' + BET + ' DA)', { show_alert: true }).catch(() => {});
+        await dbRun('UPDATE pro_bank_accounts SET balance=balance-$1 WHERE user_id=$2', [BET, uid2]).catch(() => {});
+        await dbRun("INSERT INTO pro_bank_transactions(from_id,to_id,amount,fee,type,note) VALUES($1,0,$2,0,'slot_bet','رهان سلوت')", [uid2, BET]).catch(() => {});
         const symbols = ['🍎','🍊','🍋','🍒','🍇','⭐','💎','7️⃣'];
         const r1 = symbols[Math.floor(Math.random()*symbols.length)];
         const r2 = symbols[Math.floor(Math.random()*symbols.length)];
@@ -782,10 +783,10 @@ module.exports.registerCallbacks = function(bot, deps) {
           else {win=BET*3;resultTxt='🎉 *ثلاثة متشابهة ×3*';}
         } else if (r1===r2||r2===r3||r1===r3) { win=Math.floor(BET*1.5); resultTxt='✅ *اثنان متشابهان ×1.5*'; }
         else { resultTxt='❌ *خسرت!*'; }
-        if (win>0) await dbRun('UPDATE bank_accounts SET balance=balance+$1 WHERE user_id=$2',[win,uid2]).catch(()=>{});
-        const newBal = await dbGet('SELECT balance FROM bank_accounts WHERE user_id=$1',[uid2]).then(r=>r?.balance||0).catch(()=>0);
+        if (win>0) { await dbRun('UPDATE pro_bank_accounts SET balance=balance+$1 WHERE user_id=$2',[win,uid2]).catch(()=>{}); await dbRun("INSERT INTO pro_bank_transactions(from_id,to_id,amount,fee,type,note) VALUES(0,$1,$2,0,'slot_win','ربح سلوت')", [uid2, win]).catch(() => {}); }
+        const newBal = await dbGet('SELECT balance FROM pro_bank_accounts WHERE user_id=$1',[uid2]).then(r=>r?.balance||0).catch(()=>0);
         await ctx.editMessageText(
-          '🎰 *ماكينة القمار*\n\n[ '+r1+' | '+r2+' | '+r3+' ]\n\n'+resultTxt+'\n'+(win>0?'💰 ربحت: *'+win+' دج*':'💸 خسرت: *'+BET+' دج*')+'\n👛 رصيدك: *'+parseFloat(newBal).toFixed(0)+' دج*',
+          '🎰 *ماكينة القمار*\n\n[ '+r1+' | '+r2+' | '+r3+' ]\n\n'+resultTxt+'\n'+(win>0?'💰 ربحت: *'+win+' DA*':'💸 خسرت: *'+BET+' DA*')+'\n👛 رصيدك: *'+parseFloat(newBal).toFixed(0)+' DA*',
           { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[
             {text:'🎰 العب مجدداً', callback_data:'slot_play_'+uid2},
             {text:'💰 رصيدي', callback_data:'slot_bal_'+uid2},
@@ -797,8 +798,8 @@ module.exports.registerCallbacks = function(bot, deps) {
       if (data.startsWith('slot_bal_')) {
         const uid2 = parseInt(data.replace('slot_bal_', ''));
         const { get: dbGet } = require('../database/db');
-        const acc = await dbGet('SELECT balance FROM bank_accounts WHERE user_id=$1',[uid2]).catch(()=>null);
-        return ctx.answerCbQuery('💰 رصيدك: '+(acc?parseFloat(acc.balance).toFixed(0):0)+' دج', { show_alert:true }).catch(()=>{});
+        const acc = await dbGet('SELECT balance FROM pro_bank_accounts WHERE user_id=$1',[uid2]).catch(()=>null);
+        return ctx.answerCbQuery('💰 رصيدك: '+(acc?parseFloat(acc.balance).toFixed(0):0)+' DA', { show_alert:true }).catch(()=>{});
       }
 
       // ── shop callbacks ──
@@ -817,20 +818,22 @@ module.exports.registerCallbacks = function(bot, deps) {
         ];
         const item = items.find(i=>i.id===itemId);
         if (!item) return ctx.answerCbQuery('❌ منتج غير موجود', {show_alert:true}).catch(()=>{});
-        const acc = await dbGet('SELECT balance FROM bank_accounts WHERE user_id=$1',[uid2]).catch(()=>null);
+        const acc = await dbGet('SELECT balance FROM pro_bank_accounts WHERE user_id=$1',[uid2]).catch(()=>null);
         if (!acc || parseFloat(acc.balance) < item.price)
-          return ctx.answerCbQuery('❌ رصيدك غير كافٍ! تحتاج '+item.price+' دج', {show_alert:true}).catch(()=>{});
-        await dbRun('UPDATE bank_accounts SET balance=balance-$1 WHERE user_id=$2',[item.price, uid2]).catch(()=>{});
+          return ctx.answerCbQuery('❌ رصيدك غير كافٍ! تحتاج '+item.price+' DA', {show_alert:true}).catch(()=>{});
+        await dbRun('UPDATE pro_bank_accounts SET balance=balance-$1 WHERE user_id=$2',[item.price, uid2]).catch(()=>{});
+        await dbRun("INSERT INTO pro_bank_transactions(from_id,to_id,amount,fee,type,note) VALUES($1,0,$2,0,'shop_purchase',$3)", [uid2, item.price, item.name]).catch(()=>{});
         // تنفيذ المنتج
         if (itemId === 5) {
           const bonus = Math.floor(Math.random()*1900)+100;
-          await dbRun('UPDATE bank_accounts SET balance=balance+$1 WHERE user_id=$2',[bonus,uid2]).catch(()=>{});
-          return ctx.answerCbQuery('📦 فتحت الصندوق وربحت '+bonus+' دج! 🎉', {show_alert:true}).catch(()=>{});
+          await dbRun('UPDATE pro_bank_accounts SET balance=balance+$1 WHERE user_id=$2',[bonus,uid2]).catch(()=>{});
+          await dbRun("INSERT INTO pro_bank_transactions(from_id,to_id,amount,fee,type,note) VALUES(0,$1,$2,0,'shop_box','صندوق مفاجأة')", [uid2, bonus]).catch(()=>{});
+          return ctx.answerCbQuery('📦 فتحت الصندوق وربحت '+bonus+' DA! 🎉', {show_alert:true}).catch(()=>{});
         }
         await ctx.answerCbQuery('✅ اشتريت '+item.name+'!', {show_alert:true}).catch(()=>{});
-        const newBal = await dbGet('SELECT balance FROM bank_accounts WHERE user_id=$1',[uid2]).then(r=>r?.balance||0).catch(()=>0);
+        const newBal = await dbGet('SELECT balance FROM pro_bank_accounts WHERE user_id=$1',[uid2]).then(r=>r?.balance||0).catch(()=>0);
         await ctx.editMessageText(
-          '✅ *تمت عملية الشراء!*\n\n'+item.name+'\n💰 المبلغ: '+item.price+' دج\n👛 رصيدك الآن: '+parseFloat(newBal).toFixed(0)+' دج',
+          '✅ *تمت عملية الشراء!*\n\n'+item.name+'\n💰 المبلغ: '+item.price+' DA\n👛 رصيدك الآن: '+parseFloat(newBal).toFixed(0)+' DA',
           { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[{text:'🏪 العودة للمتجر', callback_data:'shop_back_'+uid2}]]}}
         ).catch(()=>{});
         return;
@@ -853,12 +856,12 @@ module.exports.registerCallbacks = function(bot, deps) {
         const uid2 = parseInt(data.replace('bank_stats_', ''));
         const { all: dbAll } = require('../database/db');
         const stats = await dbAll(
-          'SELECT type, SUM(amount) as total, COUNT(*) as cnt FROM bank_transactions WHERE to_id=$1 OR from_id=$1 GROUP BY type',
+          'SELECT type, SUM(amount) as total, COUNT(*) as cnt FROM pro_bank_transactions WHERE to_id=$1 OR from_id=$1 GROUP BY type',
           [uid2]
         ).catch(() => []);
         let txt = '📊 *إحصائياتك البنكية*\n━━━━━━━━━━━━━━━━━━\n\n';
         for (const s of stats) {
-          txt += '• ' + (s.type||'معاملة') + ': ' + s.cnt + ' مرة (' + s.total + ' دج)\n';
+          txt += '• ' + (s.type||'معاملة') + ': ' + s.cnt + ' مرة (' + s.total + ' DA)\n';
         }
         if (!stats.length) txt += '_لا توجد معاملات بعد_';
         await ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
@@ -867,12 +870,12 @@ module.exports.registerCallbacks = function(bot, deps) {
       if (data === 'bank_top') {
         const { all: dbAll } = require('../database/db');
         const top = await dbAll(
-          'SELECT user_id, first_name, balance FROM bank_accounts ORDER BY balance DESC LIMIT 10'
+          'SELECT user_id, first_name, balance FROM pro_bank_accounts ORDER BY balance DESC LIMIT 10'
         ).catch(() => []);
         let txt = '🏆 *أثرى المستخدمين*\n━━━━━━━━━━━━━━━━━━\n\n';
         const medals = ['🥇','🥈','🥉'];
         top.forEach((u,i) => {
-          txt += (medals[i]||i+1+'.') + ' ' + (u.first_name||'مجهول') + ' — *' + parseFloat(u.balance).toLocaleString() + ' دج*\n';
+          txt += (medals[i]||i+1+'.') + ' ' + (u.first_name||'مجهول') + ' — *' + parseFloat(u.balance).toLocaleString() + ' DA*\n';
         });
         await ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
         return ctx.answerCbQuery('').catch(() => {});

@@ -267,7 +267,7 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
     if (!ctx.isOwner && !ctx.isAdmin) return;
     const rows = [
       [{ text:'📁 المحتوى', callback_data:'manage' }, { text:'👥 المستخدمون', callback_data:'manage_users_0' }],
-      [{ text:'🏦 البنك', callback_data:'mg_bank_panel' }, { text:'🎮 الألعاب', callback_data:'gp_million_panel' }],
+      [{ text:'🏦 البنك', callback_data:'mg_pro_bank_panel' }, { text:'🎮 الألعاب', callback_data:'gp_million_panel' }],
       [{ text:'📊 إحصائيات', callback_data:'manage_analytics' }, { text:'⚙️ الإعدادات', callback_data:'manage_settings' }],
     ];
     return ctx.reply('🛡️ *لوحة الإدارة*\n━━━━━━━━━━━━━━━', {

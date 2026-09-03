@@ -703,41 +703,6 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
           { ...build([back('mg_pro_bank_panel')]) });
       }
 
-      case 'mg_bank_add_id': {
-        const targetId = parseInt(text);
-        if(!targetId || isNaN(targetId)) {
-          return ctx.reply('❌ ID غير صحيح، أرسل رقم ID فقط').catch(()=>{});
-        }
-        const acc = await dbG('SELECT * FROM bank_accounts WHERE user_id=$1',[targetId]).catch(()=>null);
-        if(!acc) {
-          return ctx.reply('❌ هذا المستخدم ليس لديه حساب بنكي').catch(()=>{});
-        }
-        setState(uid, { type:'mg_bank_add_amount', targetId, targetName: acc.first_name||String(targetId) });
-        return ctx.reply(
-          '🏦 المستخدم: *' + (acc.first_name||targetId) + '*\n💰 رصيده الحالي: *' + Number(acc.balance).toLocaleString('en') + ' $*\n\nأرسل المبلغ المراد إضافته:',
-          { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_bank_panel')]]) }
-        ).catch(()=>{});
-      }
-      case 'mg_bank_add_amount': {
-        const amount = parseInt(text);
-        if(!amount || isNaN(amount) || amount === 0) {
-          return ctx.reply('❌ أرسل رقم صحيح (يمكن أن يكون سالباً للخصم)').catch(()=>{});
-        }
-        await dbR('UPDATE bank_accounts SET balance=balance+$1 WHERE user_id=$2',[amount, state.targetId]);
-        await dbR("INSERT INTO bank_transactions(from_id,to_id,amount,type,note) VALUES(0,$1,$2,'admin','إضافة يدوية من الأدمن')",[state.targetId, Math.abs(amount)]);
-        const newAcc = await dbG('SELECT balance FROM bank_accounts WHERE user_id=$1',[state.targetId]).catch(()=>null);
-        setState(uid, null);
-        // إشعار المستخدم
-        ctx.telegram.sendMessage(state.targetId,
-          (amount>0?'💰 *تم إضافة ':'💸 *تم خصم ') + Math.abs(amount).toLocaleString('en') + ' $ ' + (amount>0?'لحسابك':'من حسابك') + ' من الإدارة*\n🏦 رصيدك الجديد: *' + Number(newAcc?.balance||0).toLocaleString('en') + ' $*',
-          { parse_mode:'Markdown' }
-        ).catch(()=>{});
-        return ctx.reply(
-          '✅ *تم!*\n👤 ' + (state.targetName||state.targetId) + '\n' + (amount>0?'➕ أضيف: ':'➖ خُصم: ') + '*' + Math.abs(amount).toLocaleString('en') + ' $*\n💰 الرصيد الجديد: *' + Number(newAcc?.balance||0).toLocaleString('en') + ' $*',
-          { parse_mode:'Markdown', ...build([[btn('◀️ رجوع','mg_bank_panel')]]) }
-        ).catch(()=>{});
-      }
-
             case 'mg_ar_search': {
         const results = await all(
           "SELECT * FROM auto_replies WHERE is_active=1 AND (trigger ILIKE $1 OR response ILIKE $1) LIMIT 10",
@@ -1257,35 +1222,9 @@ if(data==='mg_auto_replies') return showAutoReplies(ctx);
       { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_pro_bank_panel')]]) });
   }
 
-  // ── البنك القديم (للتوافق) ──
+  // ── البنك القديم: تحويل تلقائي لـ Pro Bank ──
   if(data==='mg_bank_panel'){
-    return ctx.answerCbQuery('').catch(()=>{});
-  }
-
-
-  if(data==='mg_bank_add') {
-    setState(uid, { type: 'mg_bank_add_id' });
-    return eos(ctx,
-      '🏦 *إضافة رصيد يدوي*\n\n' +
-      'أرسل ID المستخدم:',
-      { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_bank_panel')]]) }
-    );
-  }
-
-    if(data==='mg_bank_top'){
-    const { all } = require('../database/db');
-    const top = await all('SELECT first_name, balance FROM bank_accounts ORDER BY balance DESC LIMIT 10').catch(()=>[]);
-    let text = '🏆 *أغنى المستخدمين*\n━━━━━━━━━━━━━━━━━━━━\n\n';
-    top.forEach((u,i) => { text += (i+1) + '. ' + (u.first_name||'مجهول') + ' — ' + Number(u.balance).toLocaleString('en') + ' $\n'; });
-    return eos(ctx, text||'لا يوجد', {parse_mode:'Markdown', ...build([back('mg_bank_panel')])});
-  }
-
-  if(data==='mg_bank_txs'){
-    const { all } = require('../database/db');
-    const txs = await all('SELECT * FROM bank_transactions ORDER BY created_at DESC LIMIT 10').catch(()=>[]);
-    let text = '💸 *آخر المعاملات*\n━━━━━━━━━━━━━━━━━━━━\n\n';
-    txs.forEach(tx => { text += (tx.type==='win'?'🏆':'💸') + ' ' + Number(tx.amount).toLocaleString('en') + ' $ — ' + (tx.note||tx.type) + '\n'; });
-    return eos(ctx, text||'لا يوجد', {parse_mode:'Markdown', ...build([back('mg_bank_panel')])});
+    return ctx.answerCbQuery('⚠️ هذا القسم قديم، استُبدل بـ 🏦 Taline Bank', { show_alert:true }).catch(()=>{});
   }
 
   if(data==='mg_notify'){setState(uid,{type:'mg_msg_user_id'});return ctx.reply('ID: ارسل ID المستخدم',{parse_mode:'Markdown',...build([back('mg_menu')])});}

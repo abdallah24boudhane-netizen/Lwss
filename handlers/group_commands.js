@@ -630,12 +630,13 @@ function setupGroupCommands(bot) {
     const name = ctx.from.first_name || "لاعب";
     const BET = 50;
 
-    const acc = await dbGet("SELECT balance FROM bank_accounts WHERE user_id=$1", [uid]).catch(() => null);
+    const acc = await dbGet("SELECT balance FROM pro_bank_accounts WHERE user_id=$1", [uid]).catch(() => null);
     if (!acc) return ctx.reply("❌ ليس لديك حساب بنكي! اكتب *انشاء حساب*", { parse_mode: "Markdown" }).catch(() => {});
-    if (parseFloat(acc.balance) < BET) return ctx.reply("❌ رصيدك غير كافٍ! تحتاج *" + BET + " دج* للعب.", { parse_mode: "Markdown" }).catch(() => {});
+    if (parseFloat(acc.balance) < BET) return ctx.reply("❌ رصيدك غير كافٍ! تحتاج *" + BET + " DA* للعب.", { parse_mode: "Markdown" }).catch(() => {});
 
     // خصم الرهان
-    await dbRun("UPDATE bank_accounts SET balance=balance-$1 WHERE user_id=$2", [BET, uid]).catch(() => {});
+    await dbRun("UPDATE pro_bank_accounts SET balance=balance-$1 WHERE user_id=$2", [BET, uid]).catch(() => {});
+    await dbRun("INSERT INTO pro_bank_transactions(from_id,to_id,amount,fee,type,note) VALUES($1,0,$2,0,'slot_bet','رهان سلوت')", [uid, BET]).catch(() => {});
 
     const symbols = ["🍎", "🍊", "🍋", "🍒", "🍇", "⭐", "💎", "7️⃣"];
     const r1 = symbols[Math.floor(Math.random() * symbols.length)];
@@ -659,10 +660,11 @@ function setupGroupCommands(bot) {
     }
 
     if (win > 0) {
-      await dbRun("UPDATE bank_accounts SET balance=balance+$1 WHERE user_id=$2", [win, uid]).catch(() => {});
+      await dbRun("UPDATE pro_bank_accounts SET balance=balance+$1 WHERE user_id=$2", [win, uid]).catch(() => {});
+      await dbRun("INSERT INTO pro_bank_transactions(from_id,to_id,amount,fee,type,note) VALUES(0,$1,$2,0,'slot_win','ربح سلوت')", [uid, win]).catch(() => {});
     }
 
-    const newBal = await dbGet("SELECT balance FROM bank_accounts WHERE user_id=$1", [uid]).then(r => r?.balance || 0).catch(() => 0);
+    const newBal = await dbGet("SELECT balance FROM pro_bank_accounts WHERE user_id=$1", [uid]).then(r => r?.balance || 0).catch(() => 0);
 
     setTimeout(async () => {
       if (spinning) {
@@ -670,8 +672,8 @@ function setupGroupCommands(bot) {
           "🎰 *ماكينة القمار*\n\n" +
           "[ " + r1 + " | " + r2 + " | " + r3 + " ]\n\n" +
           resultTxt + "\n" +
-          (win > 0 ? "💰 ربحت: *" + win + " دج*" : "💸 خسرت: *" + BET + " دج*") + "\n" +
-          "👛 رصيدك: *" + parseFloat(newBal).toFixed(0) + " دج*",
+          (win > 0 ? "💰 ربحت: *" + win + " DA*" : "💸 خسرت: *" + BET + " DA*") + "\n" +
+          "👛 رصيدك: *" + parseFloat(newBal).toFixed(0) + " DA*",
           { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[
             { text: "🎰 العب مجدداً", callback_data: "slot_play_" + uid },
             { text: "💰 رصيدي", callback_data: "slot_bal_" + uid },
@@ -689,7 +691,7 @@ function setupGroupCommands(bot) {
     delCmd(ctx);
     const { get: dbGet } = require("../database/db");
     const uid = ctx.from.id;
-    const acc = await dbGet("SELECT balance FROM bank_accounts WHERE user_id=$1", [uid]).catch(() => null);
+    const acc = await dbGet("SELECT balance FROM pro_bank_accounts WHERE user_id=$1", [uid]).catch(() => null);
     const bal = acc ? parseFloat(acc.balance).toFixed(0) : 0;
 
     const items = [
@@ -697,7 +699,7 @@ function setupGroupCommands(bot) {
       { id: 2, name: "⭐ نجمة VIP",        desc: "لقب VIP في القروب أسبوع",   price: 1000,  emoji: "⭐" },
       { id: 3, name: "🎯 تذكرة مليون",     desc: "دخول مجاني للعبة المليون",  price: 300,   emoji: "🎯" },
       { id: 4, name: "🎰 رمز سلوت ×2",     desc: "ضاعف أرباح السلوت مرة",     price: 200,   emoji: "🎰" },
-      { id: 5, name: "📦 صندوق مفاجأة",    desc: "ربح عشوائي 100-2000 دج",   price: 150,   emoji: "📦" },
+      { id: 5, name: "📦 صندوق مفاجأة",    desc: "ربح عشوائي 100-2000 DA",   price: 150,   emoji: "📦" },
     ];
 
     let txt = "🏪 *متجر البوت*\n";

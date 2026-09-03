@@ -812,5 +812,6 @@ exports.addWinnings = async (userId, firstName, username, amount, note) => {
     return true;
   } catch(e) { return false; }
 };
-exports.getAccount = getAccount;
-exports.fmt        = fmt;
+exports.getAccount    = getAccount;
+exports.ensureAccount  = ensureAccount;
+exports.fmt            = fmt;
