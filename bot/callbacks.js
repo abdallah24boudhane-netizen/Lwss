@@ -522,6 +522,13 @@ module.exports.registerCallbacks = function(bot, deps) {
     const _raw = ctx.callbackQuery?.data, cbId = ctx.callbackQuery?.id;
     if (!_raw || CBDedup.isDupe(cbId)) return;
 
+    // 🛡️ شبكة أمان: امسح أي state عالقة عند أي ضغطة زر (تنقل/رجوع/إلغاء)،
+    // إلا الأزرار اللي هي خطوة داخل ويزارد وتحتاج تقرا الحالة القديمة باش تكمل
+    const _wizardStepPrefixes = ['cg_hasans_', 'cg_showans_'];
+    if (!_wizardStepPrefixes.some(p => _raw.startsWith(p))) {
+      require('../utils/stateManager').delState(ctx.from.id).catch(() => {});
+    }
+
     // 🐺 لوب غارو — معالجة مباشرة داخل نفس الـ handler (لأن handler بدون next)
     if (_raw.startsWith('ww:') || _raw.startsWith('wwx:')) {
       try {
