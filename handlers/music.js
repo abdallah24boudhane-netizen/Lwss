@@ -109,8 +109,10 @@ function cleanupTmpPrefix(tmpBase) {
   });
 }
 
-function encodeTitle(s) {
-  return encodeURIComponent((s||'').substring(0,20)).substring(0,30);
+function encodeTitle(s, maxRaw) {
+  // نقصّ النص الخام قبل التشفير فقط — القص بعد التشفير قد يقطع رمزاً مشفّراً (%XX) في المنتصف
+  // ويسبب 'URI malformed' لاحقاً عند فك التشفير.
+  return encodeURIComponent((s||'').substring(0, maxRaw || 12));
 }
 
 function buildResultsMsg(tracks, query) {
@@ -129,7 +131,7 @@ function buildResultsMsg(tracks, query) {
 function buildResultsKb(tracks) {
   return tracks.map((t, i) => [{
     text: `${i+1}. ${t.title.substring(0,28)} — ${(t.artist?.name||'').substring(0,18)}`,
-    callback_data: `music_dl_${t.id}_${encodeTitle(t.title)}_${encodeTitle(t.artist?.name||'')}`,
+    callback_data: `music_dl_${t.id}_${encodeTitle(t.title,12)}_${encodeTitle(t.artist?.name||'',10)}`,
   }]);
 }
 
@@ -192,8 +194,9 @@ exports.handleCallback = async (ctx) => {
   if (data.startsWith('music_dl_')) {
     const parts    = data.replace('music_dl_','').split('_');
     const deezerId = parts[0];
-    const title    = decodeURIComponent(parts[1] || 'أغنية');
-    const artist   = decodeURIComponent(parts[2] || '');
+    const safeDecode = s => { try { return decodeURIComponent(s); } catch(_) { return s || ''; } };
+    const title    = safeDecode(parts[1] || 'أغنية');
+    const artist   = safeDecode(parts[2] || '');
 
     await ctx.answerCbQuery('⏳ جارٍ التحميل...').catch(()=>{});
 
