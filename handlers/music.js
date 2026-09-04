@@ -26,7 +26,7 @@ async function ensureFreshYtdlp() {
   try {
     if (!fs.existsSync(FRESH_YTDLP_PATH)) {
       const res = await fetch(
-        'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp',
+        'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux',
         { redirect: 'follow' }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
