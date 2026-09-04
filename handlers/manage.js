@@ -3,6 +3,7 @@ const content=require('../database/content');
 const bundlesDb=require('../database/bundles');
 const filesDb=require('../database/files');
 const adminsDb=require('../database/admins');
+const { botRequirePerm } = require('../middlewares/rbac'); // ✅ RBAC مركزي — نفس نظام الصلاحيات الموجود في database/admins.js
 const usersDb=require('../database/users');
 const interactions=require('../database/interactions');
 const browse=require('./browse');
@@ -504,7 +505,10 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         ctx.reply('✅ تم حفظ رسالة /start!'+(state.mediaFileId ? ' (مع '+(state.mediaType==='photo'?'صورة':'فيديو')+')' : ''),{parse_mode:'Markdown'}).catch(()=>{});
         return handleCallback(ctx,'mg_bot_settings');
       }
-      case 'mg_broadcast':{clearState(uid);const ids=await usersDb.allIds();const total_bc=ids.length;const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});const bcRes=await concurrentBroadcast(ctx.telegram,ctx.chat.id,sm.message_id,ids,'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+bcRes.sent+' | ❌ '+bcRes.failed,{...build([back('mg_menu')]),parse_mode:'Markdown'}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });break;}
+      // 🛡️ دفاع إضافي (defense-in-depth): إعادة التحقق من الصلاحية وقت التنفيذ الفعلي
+      // للبث، وليس فقط عند بدء الحوار — يحمي من أي حالة نادرة تُغيَّر فيها صلاحيات
+      // المستخدم بين لحظة الضغط على الزر ولحظة إرسال نص البث.
+      case 'mg_broadcast':{clearState(uid);if(!(await botRequirePerm(ctx,'broadcast'))) break;const ids=await usersDb.allIds();const total_bc=ids.length;const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});const bcRes=await concurrentBroadcast(ctx.telegram,ctx.chat.id,sm.message_id,ids,'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+bcRes.sent+' | ❌ '+bcRes.failed,{...build([back('mg_menu')]),parse_mode:'Markdown'}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });break;}
       case 'mg_msg_user_id':{setState(uid,{...state,type:'mg_msg_user_content',targetId:text.replace('@','')});ctx.reply('📝 ارسل الرسالة (نص، صورة، فيديو، sticker، voice):',{parse_mode:'Markdown',...build([[btn('❌ إلغاء','mg_menu')]])});break;}
       case 'mg_msg_user_content':{
         clearState(uid);
@@ -558,7 +562,8 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         ctx.reply('✅ أُرسل لـ *'+gSent+'* قروب'+(gFail?' | ❌ '+gFail:''),{parse_mode:'Markdown',...build([back('mg_menu')])});
         break;}
       case 'mg_notify_msg':{clearState(uid);const nIds=await interactions.getActiveUsers(7);await safeAdd(broadcastQueue,'broadcast-all',{userIds:nIds,message:'🔔 *إشعار*\n\n'+text,parseMode:'Markdown',fromUid:uid});ctx.reply('📤 جاري الإرسال لـ *'+nIds.length+'* مستخدم — ستصلك النتيجة لما ينتهي',{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
-      case 'mg_add_admin_id':{const tid=parseInt(text);if(isNaN(tid)){clearState(uid);return ctx.reply('❌ ID غير صحيح.');}await adminsDb.add(tid,uid);await interactions.addLog(uid,'add_admin','ID: '+tid);if(global.invalidateAdmin) global.invalidateAdmin(tid);const specs=await content.getSpecs();const spRows=specs.map(s=>[btn('🎓 '+s.name,'mg_admin_sp_'+tid+'_'+s.id)]);spRows.push([btn('كل التخصصات','mg_admin_sp_'+tid+'_0')]);clearState(uid);ctx.reply('اختر تخصص المشرف:',{...build(spRows)});try{ctx.telegram.sendMessage(tid,'🎉 تمت إضافتك مشرفاً',{parse_mode:'Markdown'});}catch(_){}break;}
+      // 🛡️ دفاع إضافي: إعادة تحقق Owner وقت التنفيذ الفعلي لإضافة الأدمن، وليس فقط عند بدء الحوار.
+      case 'mg_add_admin_id':{if(!ctx.isOwner){clearState(uid);return ctx.answerCbQuery?null:ctx.reply('🚫 للمالك فقط.');}const tid=parseInt(text);if(isNaN(tid)){clearState(uid);return ctx.reply('❌ ID غير صحيح.');}await adminsDb.add(tid,uid);await interactions.addLog(uid,'add_admin','ID: '+tid);if(global.invalidateAdmin) global.invalidateAdmin(tid);const specs=await content.getSpecs();const spRows=specs.map(s=>[btn('🎓 '+s.name,'mg_admin_sp_'+tid+'_'+s.id)]);spRows.push([btn('كل التخصصات','mg_admin_sp_'+tid+'_0')]);clearState(uid);ctx.reply('اختر تخصص المشرف:',{...build(spRows)});try{ctx.telegram.sendMessage(tid,'🎉 تمت إضافتك مشرفاً',{parse_mode:'Markdown'});}catch(_){}break;}
       case 'mg_maint_msg':{
         await require('../database/db').setSetting('maintenance_msg', text);
         global._maintMsgCache = null; // إبطال الكاش فوراً
@@ -1070,14 +1075,17 @@ if(data==='mg_auto_replies') return showAutoReplies(ctx);
   }
   if(data==='mg_analytics') return showAnalytics(ctx);
   if(data==='mg_logs') return showLogs(ctx);
-  if(data==='mg_users'){try{const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('view_users')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});return await showUsers(ctx);}catch(e){console.error('[mg_users]',e.message);return ctx.reply('❌ خطأ: '+e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });}}
-  if(data==='mg_admins') return showAdmins(ctx);
+  if(data==='mg_users'){try{if(!(await botRequirePerm(ctx,'view_users'))) return; return await showUsers(ctx);}catch(e){console.error('[mg_users]',e.message);return ctx.reply('❌ خطأ: '+e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });}}
+  // 🔒 إدارة الأدمنية (عرض/إضافة/حذف/تعديل صلاحيات) — Owner فقط دائماً، بلا استثناء،
+  // لمنع أي أدمن (حتى لو "full") من التلاعب بقائمة الأدمنية نفسها (privilege escalation).
+  if(data==='mg_admins'){ if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{}); return showAdmins(ctx); }
   if(data==='mg_trash') return showTrash(ctx);
   if(data==='mg_search_prompt'){setState(uid,{type:'mg_admin_search'});return ctx.reply('🔍 بحث:\nأدخل اسم ملف أو مستخدم:');}
   // ══════════════════════════════════════
   //  🏦  Taline Bank Admin Panel
   // ══════════════════════════════════════
   if (data === 'mg_pro_bank_panel') {
+    if(!(await botRequirePerm(ctx,'view_users'))) return;
     try {
       const { all } = require('../database/db');
       const [accs, txs, loans, invests] = await Promise.all([
@@ -1182,6 +1190,7 @@ if(data==='mg_auto_replies') return showAutoReplies(ctx);
 
   // ── إضافة رصيد ──
   if (data === 'mg_pb_add') {
+    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});
     setState(uid, { type: 'mg_pb_add_id', op: 'add' });
     return eos(ctx, '➕ *إضافة رصيد*\n\nأرسل ID المستخدم:', 
       { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_pro_bank_panel')]]) });
@@ -1189,6 +1198,7 @@ if(data==='mg_auto_replies') return showAutoReplies(ctx);
 
   // ── خصم رصيد ──
   if (data === 'mg_pb_deduct') {
+    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});
     setState(uid, { type: 'mg_pb_add_id', op: 'deduct' });
     return eos(ctx, '➖ *خصم رصيد*\n\nأرسل ID المستخدم:',
       { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_pro_bank_panel')]]) });
@@ -1196,6 +1206,7 @@ if(data==='mg_auto_replies') return showAutoReplies(ctx);
 
   // ── بحث مستخدم ──
   if (data === 'mg_pb_search') {
+    if(!(await botRequirePerm(ctx,'view_users'))) return;
     setState(uid, { type: 'mg_pb_search_id' });
     return eos(ctx, '🔍 *بحث عن مستخدم*\n\nأرسل ID أو اسم المستخدم:',
       { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_pro_bank_panel')]]) });
@@ -1203,6 +1214,7 @@ if(data==='mg_auto_replies') return showAutoReplies(ctx);
 
   // ── تجميد/فك تجميد ──
   if (data === 'mg_pb_freeze') {
+    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});
     setState(uid, { type: 'mg_pb_freeze_id' });
     return eos(ctx, '🚫 *تجميد/فك تجميد حساب*\n\nأرسل ID المستخدم:',
       { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_pro_bank_panel')]]) });
@@ -1210,6 +1222,7 @@ if(data==='mg_auto_replies') return showAutoReplies(ctx);
 
   // ── ترقية بطاقة ──
   if (data === 'mg_pb_upgrade') {
+    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});
     setState(uid, { type: 'mg_pb_upgrade_id' });
     return eos(ctx, '💳 *ترقية بطاقة يدوية*\n\nأرسل ID المستخدم:',
       { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_pro_bank_panel')]]) });
@@ -1217,6 +1230,7 @@ if(data==='mg_auto_replies') return showAutoReplies(ctx);
 
   // ── إعادة ضبط حساب ──
   if (data === 'mg_pb_reset') {
+    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});
     setState(uid, { type: 'mg_pb_reset_id' });
     return eos(ctx, '🔄 *إعادة ضبط حساب*\n⚠️ سيُصفَّر الرصيد!\n\nأرسل ID المستخدم:',
       { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_pro_bank_panel')]]) });
@@ -1266,7 +1280,9 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
     global._maintMsgCache=null;
     return showMaintPanel(ctx);
   }
+  // 🔒 نسخ احتياطي كامل لقاعدة البيانات — يحتوي بيانات كل المستخدمين. Owner فقط.
   if(data==='mg_backup'){
+    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});
     const msg = await ctx.reply('⏳ جاري تصدير كل البيانات (قد يستغرق دقيقة)...').catch(()=>{});
     try {
       const { exportAll } = require('../utils/backup_full');
@@ -1294,7 +1310,9 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
     }
     return;
   }
+  // 🔒 إعدادات البوت العامة (تؤثر على كل المستخدمين) — Owner فقط.
   if(data==='mg_bot_settings'){
+    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});
     const wt=await require('../database/db').getSetting('start_welcome_text').catch(()=>null);
     const preview=wt?wt.substring(0,150):'_غير مفعّل_';
     const r2=[[btn('✏️ تعديل رسالة /start','mg_edit_welcome')]];
@@ -1302,7 +1320,9 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
     r2.push(back('mg_menu'));
     return eos(ctx,'⚙️ *إعدادات البوت*'+String.fromCharCode(10)+'━━━━━━━━━━━━━━━'+String.fromCharCode(10)+'📝 *رسالة /start:*'+String.fromCharCode(10)+preview,{parse_mode:'Markdown',...build(r2)});}
 
+  // 🔒 تعديل/حذف رسالة /start العامة (تؤثر على كل المستخدمين الجدد) — جزء من إعدادات البوت، Owner فقط.
   if(data==='mg_edit_welcome'){
+    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});
     setState(uid,{type:'mg_set_welcome'});
     const VARS = '📝 *المتغيرات المتاحة:*\n'+
       '`{name}` الاسم | `{username}` يوزر\n'+
@@ -1321,15 +1341,21 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
     ).catch(()=>{});
   }
 
-  if(data==='mg_del_welcome'){await require('../database/db').run("DELETE FROM settings WHERE key IN ('start_welcome_text','start_welcome_media_id','start_welcome_media_type')").catch(()=>{});ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});return handleCallback(ctx,'mg_bot_settings');}
+  if(data==='mg_del_welcome'){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});await require('../database/db').run("DELETE FROM settings WHERE key IN ('start_welcome_text','start_welcome_media_id','start_welcome_media_type')").catch(()=>{});ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});return handleCallback(ctx,'mg_bot_settings');}
 
-  if(data==='mg_restore'){setState(uid,{type:'mg_awaiting_restore'});return eos(ctx,'♻️ *استعادة كاملة*\n\n⚠️ سيُستبدل كل شيء: مستخدمين، ملفات، بنك، ألعاب، حماية، ردود تلقائية!\n\nأرسل ملف `.json` من "نسخ احتياطي":',{parse_mode:'Markdown',...build([back('mg_menu')])});}
-  if(data==='mg_broadcast'){setState(uid,{type:'mg_broadcast'});return ctx.reply('📢 رسالة البث:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
-  if(data==='mg_add_admin'){setState(uid,{type:'mg_add_admin_id'});return ctx.reply('👤 ID المستخدم:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
-  if(data.startsWith('mg_admin_sp_')){const p=data.replace('mg_admin_sp_','').split('_');await adminsDb.setSpecialty(p[0],p[1]);return eos(ctx,'✅ تم تحديد التخصص',{...build([back('mg_admins')])});}
-  if(data.startsWith('mg_da_')){const rid=parseInt(data.replace('mg_da_',''));await adminsDb.remove(rid);if(global.invalidateAdmin)global.invalidateAdmin(rid);return showAdmins(ctx);}
-  if(data.startsWith('mg_ep_')) return showEditPerms(ctx,data.replace('mg_ep_',''));
-  if(data.startsWith('mg_tp_')){const p=data.replace('mg_tp_','').split('_');const adminId=p[0];const perm=p.slice(1).join('_');const list=await adminsDb.getAll();const admin=list.find(a=>a.user_id==adminId);if(!admin) return ctx.answerCbQuery('❌').catch(()=>{});let perms=(admin.permissions||'').split(',').map(x=>x.trim()).filter(Boolean);if(perms.includes(perm)) perms=perms.filter(x=>x!==perm);else{if(perm==='full') perms=['full'];else{perms=perms.filter(x=>x!=='full');perms.push(perm);}}await adminsDb.updatePerms(adminId,perms.join(','));return showEditPerms(ctx,adminId);}
+  if(data==='mg_restore'){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});setState(uid,{type:'mg_awaiting_restore'});return eos(ctx,'♻️ *استعادة كاملة*\n\n⚠️ سيُستبدل كل شيء: مستخدمين، ملفات، بنك، ألعاب، حماية، ردود تلقائية!\n\nأرسل ملف `.json` من "نسخ احتياطي":',{parse_mode:'Markdown',...build([back('mg_menu')])});}
+  // 📢 البث للكل — مربوط بصلاحية 'broadcast' الموجودة في ALL_PERMS (Owner مسموح دائماً تلقائياً).
+  if(data==='mg_broadcast'){if(!(await botRequirePerm(ctx,'broadcast'))) return;setState(uid,{type:'mg_broadcast'});return ctx.reply('📢 رسالة البث:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
+  // 🔒 كل ما يخص إدارة "الأدمنية أنفسهم" (إضافة/حذف/تحديد تخصص/تعديل صلاحيات) — Owner فقط دائماً.
+  // هذا يمنع بالتحديد سيناريو privilege escalation: أدمن يمنح نفسه أو غيره صلاحية 'full'.
+  if(data==='mg_add_admin'){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});setState(uid,{type:'mg_add_admin_id'});return ctx.reply('👤 ID المستخدم:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
+  if(data.startsWith('mg_admin_sp_')){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});const p=data.replace('mg_admin_sp_','').split('_');await adminsDb.setSpecialty(p[0],p[1]);return eos(ctx,'✅ تم تحديد التخصص',{...build([back('mg_admins')])});}
+  if(data.startsWith('mg_da_')){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});const rid=parseInt(data.replace('mg_da_',''));await adminsDb.remove(rid);if(global.invalidateAdmin)global.invalidateAdmin(rid);return showAdmins(ctx);}
+  if(data.startsWith('mg_ep_')){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{}); return showEditPerms(ctx,data.replace('mg_ep_',''));}
+  // 🔒🔴 الأهم أمنياً: هذا الزر يُبدّل صلاحيات أدمن (بما فيها منح 'full'). كان بلا أي حماية
+  // خاصة به سوى فحص isAdmin الخارجي — أي أدمن كان يستطيع نظرياً تعديل صلاحيات أدمن آخر
+  // (أو حتى صلاحياته هو لو توفّر له الزر) عبر هذا المسار. الآن Owner فقط، بلا استثناء.
+  if(data.startsWith('mg_tp_')){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});const p=data.replace('mg_tp_','').split('_');const adminId=p[0];const perm=p.slice(1).join('_');const list=await adminsDb.getAll();const admin=list.find(a=>a.user_id==adminId);if(!admin) return ctx.answerCbQuery('❌').catch(()=>{});let perms=(admin.permissions||'').split(',').map(x=>x.trim()).filter(Boolean);if(perms.includes(perm)) perms=perms.filter(x=>x!==perm);else{if(perm==='full') perms=['full'];else{perms=perms.filter(x=>x!=='full');perms.push(perm);}}await adminsDb.updatePerms(adminId,perms.join(','));return showEditPerms(ctx,adminId);}
   if(data.startsWith('mg_profile_')) return showUserProfile(ctx,data.replace('mg_profile_',''));
 
   // ── تواصل مع مستخدم ──
@@ -1358,8 +1384,9 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
     return showUsers(ctx, pg, filter);
   }
   if(data.startsWith('mg_restore_fl_')){await filesDb.restore(data.replace('mg_restore_fl_',''));return showTrash(ctx);}
-  if(data==='mg_empty_trash'){return eos(ctx,'⚠️ حذف الكل نهائياً؟',build([[btn('✅ تأكيد','mg_confirm_empty')],[btn('❌ إلغاء','mg_trash')]]));}
-  if(data==='mg_confirm_empty'){await dbRun('DELETE FROM files WHERE is_deleted=1');return eos(ctx,'✅ تم حذف السلة!',{parse_mode:'Markdown',...build([back('mg_menu')])});}
+  // 🗑 حذف نهائي دائم (لا رجوع) — مربوط بصلاحية 'delete' الموجودة (Owner مسموح دائماً).
+  if(data==='mg_empty_trash'){if(!(await botRequirePerm(ctx,'delete'))) return;return eos(ctx,'⚠️ حذف الكل نهائياً؟',build([[btn('✅ تأكيد','mg_confirm_empty')],[btn('❌ إلغاء','mg_trash')]]));}
+  if(data==='mg_confirm_empty'){if(!(await botRequirePerm(ctx,'delete'))) return;await dbRun('DELETE FROM files WHERE is_deleted=1');return eos(ctx,'✅ تم حذف السلة!',{parse_mode:'Markdown',...build([back('mg_menu')])});}
   if(data.startsWith('mg_yrs_')) return showYears(ctx,data.replace('mg_yrs_',''));
   if(data.startsWith('mg_sems_')){const p=data.replace('mg_sems_','').split('_');return showSemesters(ctx,p[0],p[1]);}
   if(data.startsWith('mg_sbs_')){const p=data.replace('mg_sbs_','').split('_');return showSubjects(ctx,p[0],p[1],p[2]);}
@@ -1390,11 +1417,11 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
   if(data.startsWith('mg_dl_bundle_')){const p=data.replace('mg_dl_bundle_','').split('_');const _bId=parseInt(p[0]),_bCat=parseInt(p[1]);await bundlesDb.deleteBundle(_bId);const {cacheClearPrefix:ccp,cacheClear:cc}=require('../utils/cache');ccp('showfiles_'+_bCat);cc('bdls_'+_bCat);cc('bundle_full_'+_bId);await ctx.answerCbQuery('✅ تم حذف الحزمة').catch(err => { require('../utils/logger').debug("[silent]", err.message); });return browse.showFiles(ctx,p[2],p[3],p[4],p[5],p[1],0);}
   if(data.startsWith('mg_rn_bundle_')){const p=data.replace('mg_rn_bundle_','').split('_');setState(uid,{type:'mg_rename_bundle',bundleId:p[0],catId:p[1],spId:p[2],yrId:p[3],smId:p[4],sbId:p[5]});return ctx.reply('✏️ الاسم الجديد:');}
   if(data.startsWith('mg_add_bundle_')){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط.',{show_alert:true});const p=data.replace('mg_add_bundle_','').split('_');setState(uid,{type:'mg_bundle_title',spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('📦 اسم الحزمة:');}
-  if(data.startsWith('mg_upl_bulk_')){const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('upload')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});const pr=data.replace('mg_upl_bulk_','').split('_');setState(uid,{type:'mg_bulk_prefix',spId:pr[0],yrId:pr[1],smId:pr[2],sbId:pr[3],catId:pr[4]});return ctx.reply('رفع متعدد — بادئة للأسماء؟ أو skip:');}
-  if(data.startsWith('mg_upl_')){const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('upload')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});const pr=data.replace('mg_upl_','').split('_');setState(uid,{type:'mg_upl_title',spId:pr[0],yrId:pr[1],smId:pr[2],sbId:pr[3],catId:pr[4]});return ctx.reply('✏️ عنوان الملف:');}
+  if(data.startsWith('mg_upl_bulk_')){if(!(await botRequirePerm(ctx,'upload'))) return;const pr=data.replace('mg_upl_bulk_','').split('_');setState(uid,{type:'mg_bulk_prefix',spId:pr[0],yrId:pr[1],smId:pr[2],sbId:pr[3],catId:pr[4]});return ctx.reply('رفع متعدد — بادئة للأسماء؟ أو skip:');}
+  if(data.startsWith('mg_upl_')){if(!(await botRequirePerm(ctx,'upload'))) return;const pr=data.replace('mg_upl_','').split('_');setState(uid,{type:'mg_upl_title',spId:pr[0],yrId:pr[1],smId:pr[2],sbId:pr[3],catId:pr[4]});return ctx.reply('✏️ عنوان الملف:');}
   if(data.startsWith('mg_rn_fl_')){const p=data.replace('mg_rn_fl_','').split('_');setState(uid,{type:'mg_rn_fl',id:p[5],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('✏️ العنوان الجديد:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data.startsWith('mg_desc_fl_')){const p=data.replace('mg_desc_fl_','').split('_');setState(uid,{type:'mg_desc_fl',id:p[5],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('📝 الوصف الجديد:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
-  if(data.startsWith('mg_dl_fl_')){const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('delete')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});const pr=data.replace('mg_dl_fl_','').split('_');const f=await filesDb.getFile(pr[5]);return eos(ctx,'🗑 نقل *'+escMd(f?.title||'الملف')+'* للسلة؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_fl_'+pr.join('_')),btn('❌ لا','mg_fls_'+pr.slice(0,5).join('_'))]])});}
+  if(data.startsWith('mg_dl_fl_')){if(!(await botRequirePerm(ctx,'delete'))) return;const pr=data.replace('mg_dl_fl_','').split('_');const f=await filesDb.getFile(pr[5]);return eos(ctx,'🗑 نقل *'+escMd(f?.title||'الملف')+'* للسلة؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_fl_'+pr.join('_')),btn('❌ لا','mg_fls_'+pr.slice(0,5).join('_'))]])});}
   if(data.startsWith('mg_cdl_fl_')){const p=data.replace('mg_cdl_fl_','').split('_');await filesDb.softDelete(p[5]);return showMgFiles(ctx,p[0],p[1],p[2],p[3],p[4]);}
   }catch(e){console.error('[CB]',e.message);ctx.reply('❌ '+e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });}
 }

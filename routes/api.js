@@ -55,6 +55,9 @@ const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch
 const router = express.Router();
 const { verifyWebApp } = require('../utils/webapp_auth');
 const { rateLimit } = require('../utils/apiRateLimit');
+// ✅ RBAC مركزي — نفس نظام الصلاحيات الموجود في database/admins.js (ALL_PERMS/hasPerm)
+// كل admin route أدناه يجب أن يستخدم requirePerm('<perm>') أو requireOwner() بدل الفحص الثنائي القديم.
+const { requirePerm, requireOwner } = require('../middlewares/rbac');
 
 // ── Global rate limit: 60 req/min per user ──
 router.use(rateLimit(60, 60000));
@@ -237,6 +240,8 @@ router.post('/rate/:id', auth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ℹ️ إعلامي فقط (لا يكشف بيانات حساسة) — يبقى فحص "أدمن بشكل عام" كافياً هنا،
+// لأن الغرض منه هو إخبار الواجهة الأمامية بحالة/صلاحيات المستخدم نفسه فقط.
 router.get('/admin/check', auth, async (req, res) => {
   const uid = parseInt(req.tgUser.id);
   if (!await _checkAdmin(uid)) return res.status(403).json({ error: 'forbidden' });
@@ -245,9 +250,8 @@ router.get('/admin/check', auth, async (req, res) => {
   res.json({ ok: true, isOwner, perms: adm?.permissions || (isOwner ? 'full' : '') });
 });
 
-router.get('/admin/stats', auth, async (req, res) => {
+router.get('/admin/stats', auth, requirePerm('view_users'), async (req, res) => {
   const uid = parseInt(req.tgUser.id);
-  if (!await _checkAdmin(uid)) return res.status(403).json({ error: 'forbidden' });
   const isOwner = _isOwnerUid(uid);
   try {
     const _statsCk = 'admin_stats';
@@ -273,9 +277,8 @@ router.get('/admin/stats', auth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-router.get('/admin/users', auth, async (req, res) => {
+router.get('/admin/users', auth, requirePerm('view_users'), async (req, res) => {
   const uid = parseInt(req.tgUser.id);
-  if (!await _checkAdmin(uid)) return res.status(403).json({ error: 'forbidden' });
   const isOwner = _isOwnerUid(uid);
   const q = req.query.q || '';
   const page = parseInt(req.query.page || '0');
@@ -295,48 +298,36 @@ router.get('/admin/users', auth, async (req, res) => {
   res.json(rows);
 });
 
-router.post('/admin/ban/:id', auth, async (req, res) => {
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.tgUser.id);
-  const isOwner = uid === OWNER_ID;
-  if (!isOwner) return res.status(403).json({ error: 'owner only' });
+// ✅ RBAC: كانت owner-only بدون سبب رغم وجود صلاحية 'ban_users' مخصصة لهذا الإجراء
+// بالضبط ضمن ALL_PERMS — أصبحت الآن مربوطة بالصلاحية الصحيحة (Owner يبقى مسموحاً دائماً تلقائياً).
+router.post('/admin/ban/:id', auth, requirePerm('ban_users'), async (req, res) => {
   const { ban } = req.body;
   await run('UPDATE users SET is_banned=$1 WHERE id=$2', [ban ? 1 : 0, parseInt(req.params.id)]);
   res.json({ ok: true });
 });
 
-router.get('/admin/files', auth, async (req, res) => {
-  const uid = parseInt(req.tgUser.id);
-  if (!await _checkAdmin(uid)) return res.status(403).json({ error: 'forbidden' });
-  const isOwner = _isOwnerUid(uid);
+router.get('/admin/files', auth, requirePerm('add_content'), async (req, res) => {
   const rows = await all(`SELECT f.*,c.name as cat_name FROM files f LEFT JOIN categories c ON c.id=f.category_id WHERE f.is_deleted=0 ORDER BY f.uploaded_at DESC LIMIT 50`);
   res.json(rows);
 });
 
-router.post('/admin/delfile/:id', auth, async (req, res) => {
-  const uid = parseInt(req.tgUser.id);
-  if (!await _checkAdmin(uid)) return res.status(403).json({ error: 'forbidden' });
-  const isOwner = _isOwnerUid(uid);
+router.post('/admin/delfile/:id', auth, requirePerm('delete'), async (req, res) => {
   await run('UPDATE files SET is_deleted=1 WHERE id=$1', [parseInt(req.params.id)]);
   res.json({ ok: true });
 });
 
 // ═══ ADMIN ADVANCED ROUTES ═══
 
-router.get('/admin/groups', auth, async (req, res) => {
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.tgUser.id);
-  if (!await _checkAdmin(uid) && uid !== OWNER_ID) return res.status(403).json({ error: 'forbidden' });
+router.get('/admin/groups', auth, requirePerm('manage_groups'), async (req, res) => {
   try {
     const rows = await all(`SELECT gc.*, sp.name as sp_name, COUNT(gm.user_id) as members FROM group_chats gc LEFT JOIN specialties sp ON gc.specialty_id=sp.id LEFT JOIN group_members gm ON gc.chat_id=gm.chat_id GROUP BY gc.chat_id, gc.title, gc.specialty_id, gc.notify_new_files, gc.joined_at, sp.name ORDER BY members DESC`);
     res.json(rows);
   } catch(e) { res.json([]); }
 });
 
-router.post('/admin/broadcast', auth, async (req, res) => {
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.tgUser.id);
-  if (uid !== OWNER_ID) return res.status(403).json({ error: 'owner only' });
+// ✅ RBAC: كانت owner-only رغم وجود صلاحية 'broadcast' مخصصة لهذا بالضبط ضمن ALL_PERMS —
+// أصبحت مربوطة بالصلاحية الصحيحة (Owner يبقى مسموحاً دائماً تلقائياً عبر requirePerm).
+router.post('/admin/broadcast', auth, requirePerm('broadcast'), async (req, res) => {
   const _sb308 = sanitizeBody(req.body, { text: 2000 }); const { text, target, specialtyId } = _sb308;
   if (!text) return res.status(400).json({ error: 'no text' });
   try {
@@ -362,44 +353,31 @@ router.post('/admin/broadcast', auth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-router.get('/admin/specialties', auth, async (req, res) => {
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.tgUser.id);
-  if (!await _checkAdmin(uid) && uid !== OWNER_ID) return res.status(403).json({ error: 'forbidden' });
+router.get('/admin/specialties', auth, requirePerm('add_content'), async (req, res) => {
   const rows = await all('SELECT * FROM specialties WHERE is_deleted=0 ORDER BY id');
   res.json(rows);
 });
 
-router.get('/admin/reports', auth, async (req, res) => {
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.tgUser.id);
-  if (!await _checkAdmin(uid) && uid !== OWNER_ID) return res.status(403).json({ error: 'forbidden' });
+router.get('/admin/reports', auth, requirePerm('add_content'), async (req, res) => {
   try {
     const rows = await all(`SELECT r.*, f.title as file_title, u.first_name FROM reports r LEFT JOIN files f ON f.id=r.file_id LEFT JOIN users u ON u.id=r.user_id WHERE r.status='pending' ORDER BY r.created_at DESC LIMIT 30`);
     res.json(rows);
   } catch(e) { res.json([]); }
 });
 
-router.post('/admin/report/:id/resolve', auth, async (req, res) => {
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.tgUser.id);
-  if (!await _checkAdmin(uid) && uid !== OWNER_ID) return res.status(403).json({ error: 'forbidden' });
+router.post('/admin/report/:id/resolve', auth, requirePerm('add_content'), async (req, res) => {
   await run('UPDATE reports SET status=$1 WHERE id=$2', [req.body.status || 'resolved', parseInt(req.params.id)]);
   res.json({ ok: true });
 });
 
-router.get('/admin/admins', auth, async (req, res) => {
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.tgUser.id);
-  if (uid !== OWNER_ID) return res.status(403).json({ error: 'owner only' });
+// 🔒 حساس جداً: إدارة قائمة الأدمنية نفسها تبقى Owner-only دائماً — لا صلاحية أدمن تمنح هذا،
+// لمنع privilege-escalation (أدمن يضيف/يحذف أدمنية آخرين).
+router.get('/admin/admins', auth, requireOwner(), async (req, res) => {
   const rows = await all(`SELECT a.*, u.first_name, u.username FROM admins a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.added_at DESC`);
   res.json(rows);
 });
 
-router.post('/admin/removeadmin/:id', auth, async (req, res) => {
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.tgUser.id);
-  if (uid !== OWNER_ID) return res.status(403).json({ error: 'owner only' });
+router.post('/admin/removeadmin/:id', auth, requireOwner(), async (req, res) => {
   await run('DELETE FROM admins WHERE user_id=$1', [parseInt(req.params.id)]);
   res.json({ ok: true });
 });
@@ -421,13 +399,7 @@ router.post('/admin/upload-media', (req, res, next) => {
   if (!user) return res.status(401).json({ error: 'unauthorized' });
   req.tgUser = user;
   next();
-}, upload.single('file'), async (req, res) => {
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.tgUser.id);
-
-  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1', [uid]).catch(() => null);
-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
-
+}, requirePerm('add_content'), upload.single('file'), async (req, res) => {
   try {
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'no file' });
@@ -473,12 +445,7 @@ router.post('/admin/upload-media', (req, res, next) => {
 
 // ─── إصلاح بروفايل المستخدم (للأونر/أدمن) ──────────────────────
 // احذف أو استبدل الـ route القديم /admin/user/:id/profile بهذا:
-router.get('/admin/user/:id/profile', auth, async (req, res) => {
-  const uid = parseInt(req.tgUser.id);
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1', [uid]).catch(() => null);
-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
-
+router.get('/admin/user/:id/profile', auth, requirePerm('view_users'), async (req, res) => {
   try {
     const targetId = req.params.id;
 
@@ -729,18 +696,26 @@ router.post('/comment/:id/like', auth, async (req, res) => {
 });
 
 // ─── إضافة مشرف جديد ──────────────────────────────────────────────
-router.post('/admin/addadmin', auth, async (req, res) => {
+// 🔒 Owner-only (إدارة الأدمنية أنفسهم لا تُمنح لأي صلاحية أدمن — يمنع privilege escalation).
+// ✅ RBAC fix: لم يعد يمنح 'full' تلقائياً عند عدم تحديد صلاحيات. يُعاد استخدام
+// database/admins.js:add() الموجود مسبقاً (بدل SQL خام مباشر هنا) لأنه يطبّق
+// sanitizePerms() ويرفض أي قيمة غير معروفة ضمن ALL_PERMS (fail-closed).
+router.post('/admin/addadmin', auth, requireOwner(), async (req, res) => {
   const uid = parseInt(req.tgUser.id);
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  if (uid !== OWNER_ID) return res.status(403).json({ error: 'owner only' });
   const { userId, permissions } = req.body;
-  if (!userId) return res.status(400).json({ error: 'userId required' });
+  const targetId = parseInt(userId);
+  if (!userId || !Number.isFinite(targetId)) return res.status(400).json({ error: 'userId required' });
+  if (!permissions || !String(permissions).trim()) {
+    return res.status(400).json({ error: 'permissions required — يجب تحديد الصلاحيات صراحة، لا يوجد افتراضي "full"' });
+  }
   try {
-    await run(
-      'INSERT INTO admins(user_id,added_by,permissions) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET permissions=$3',
-      [parseInt(userId), uid, permissions || 'full']
-    );
-    res.json({ ok: true });
+    const adminsDb = require('../database/admins');
+    const clean = adminsDb.sanitizePerms(permissions);
+    if (!clean) {
+      return res.status(400).json({ error: 'invalid permissions — تحقق من القيم المسموحة', valid: Object.keys(adminsDb.ALL_PERMS) });
+    }
+    await adminsDb.add(targetId, uid, clean);
+    res.json({ ok: true, permissions: clean });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -769,11 +744,8 @@ router.get('/channels', auth, async (req, res) => {
 });
 
 // ─── إنشاء إعلان ─────────────────────────────────────────────────
-router.post('/admin/ads', auth, async (req, res) => {
+router.post('/admin/ads', auth, requirePerm('add_content'), async (req, res) => {
   const uid = parseInt(req.tgUser.id);
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
   const _sb753 = sanitizeBody(req.body, { title: 200, body: 2000, icon: 200, link: 500, image_url: 500, video_url: 500 }); const { title, body, icon, link, specialty_id, is_pinned, image_url, video_url } = _sb753;
   if (!title) return res.status(400).json({ error: 'title required' });
   try {
@@ -796,21 +768,14 @@ router.post('/admin/ads', auth, async (req, res) => {
   }
 });
 
-router.post('/admin/ads/:id/delete', auth, async (req, res) => {
-  const uid = parseInt(req.tgUser.id);
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+router.post('/admin/ads/:id/delete', auth, requirePerm('add_content'), async (req, res) => {
   try { await run('UPDATE ads SET is_deleted=1 WHERE id=$1',[parseInt(req.params.id)]); res.json({ ok:true }); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // ─── إنشاء قناة ──────────────────────────────────────────────────
-router.post('/admin/channels', auth, async (req, res) => {
+router.post('/admin/channels', auth, requirePerm('add_content'), async (req, res) => {
   const uid = parseInt(req.tgUser.id);
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
   const { name, description, link, icon, members_count } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
   try {

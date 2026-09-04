@@ -28,10 +28,12 @@ module.exports.registerCallbacks = function(bot, deps) {
   const { run: dbRun, all: dbAll } = require('../database/db');
   const filesDb  = require('../database/files');
   const million  = require('../handlers/million');
+  const { botRequirePerm } = require('../middlewares/rbac'); // ✅ RBAC مركزي
 
   // ── Helpers ──
   async function hGrpSp(ctx, d) {
-    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    // ✅ RBAC: كانت owner-only بدون سبب رغم وجود صلاحية 'manage_groups' مخصصة لإدارة القروبات.
+    if (!(await botRequirePerm(ctx, 'manage_groups'))) return;
     const r = d.substring(7), i = r.lastIndexOf('_');
     const cid = parseInt(r.substring(0, i)), sid = parseInt(r.substring(i + 1));
     try {
@@ -44,7 +46,8 @@ module.exports.registerCallbacks = function(bot, deps) {
   }
 
   async function hGrpDl(ctx, d) {
-    if (!ctx.isOwner) return ctx.answerCbQuery('🚫').catch(() => {});
+    // ✅ RBAC: كانت owner-only بدون سبب — نفس فئة إجراءات إدارة القروبات.
+    if (!(await botRequirePerm(ctx, 'manage_groups'))) return;
     // ✅ رد فوري على الزر
     ctx.answerCbQuery('📤 جاري الإرسال...').catch(() => {});
     try {
@@ -60,7 +63,8 @@ module.exports.registerCallbacks = function(bot, deps) {
   }
 
   async function hSearchDel(ctx, d) {
-    if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    // ✅ RBAC: كان يكفي isAdmin ثنائي — الآن يتطلب صلاحية 'delete' تحديداً.
+    if (!(await botRequirePerm(ctx, 'delete'))) return;
     const p = d.substring(11).split('|'), fid = p[0], q = decodeURIComponent(p[1] || '');
     await filesDb.softDelete(fid);
     cacheClearPrefix('search_');
@@ -157,7 +161,8 @@ module.exports.registerCallbacks = function(bot, deps) {
   const prefR = [
     // Bundle
     { p: 'bundle_del_file_',  fn: async (ctx, d) => {
-      if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      // ✅ RBAC: صلاحية 'delete' تحديداً بدل isAdmin الثنائي.
+      if (!(await botRequirePerm(ctx, 'delete'))) return;
       const p = d.substring(16).split('_'), bid = parseInt(p[0]), fid = parseInt(p[1]);
       try {
         await bundlesDb.removeBundleFile(bid, fid);
@@ -170,13 +175,15 @@ module.exports.registerCallbacks = function(bot, deps) {
       } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
     }},
     { p: 'bundle_add_files_', fn: async (ctx, d) => {
-      if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      // ✅ RBAC: صلاحية 'upload' تحديداً بدل isAdmin الثنائي.
+      if (!(await botRequirePerm(ctx, 'upload'))) return;
       const bid = parseInt(d.substring(17));
       await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_bundle_files', bundleId: bid, fileCount: 0 });
       return ctx.reply('📦 أرسل الملفات الآن.\n/done للإنهاء').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }},
     { p: 'bundle_delete_',    fn: async (ctx, d) => {
-      if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      // ✅ RBAC: كانت owner-only — أصبحت مربوطة بصلاحية 'delete' (نفس فئة حذف الملفات، Owner مسموح دائماً).
+      if (!(await botRequirePerm(ctx, 'delete'))) return;
       const bid = parseInt(d.substring(14));
       try { await bundlesDb.deleteBundle(bid); await ctx.answerCbQuery('✅ تم حذف الحزمة').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); return ctx.reply('✅ تم حذف الحزمة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
       catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
@@ -499,7 +506,8 @@ module.exports.registerCallbacks = function(bot, deps) {
       return;
     }},
     { p: 'leave_grp_', fn: async (ctx, d) => {
-      if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      // ✅ RBAC: كانت owner-only — أصبحت مربوطة بصلاحية 'manage_groups' (Owner مسموح دائماً).
+      if (!(await botRequirePerm(ctx, 'manage_groups'))) return;
       const chatId = parseInt(d.substring(10));
       try {
         await ctx.telegram.leaveChat(chatId);

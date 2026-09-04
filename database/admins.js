@@ -15,6 +15,19 @@ const ALL_PERMS = {
   'full':         '👑 صلاحيات كاملة',
 };
 
+/**
+ * ✅ RBAC hardening: ينظّف/يتحقق من صحة سلسلة الصلاحيات قبل حفظها.
+ * أي قيمة غير معرّفة ضمن ALL_PERMS تُرفض بصمت (fail-closed) بدل أن تُحفظ
+ * كصلاحية "شبح" غير معروفة يمكن أن تُفسَّر لاحقاً بشكل غير متوقع.
+ * لا تسمح بإدخال 'full' ضمنياً — 'full' يجب أن يُطلب صراحة.
+ */
+const sanitizePerms = (permsInput) => {
+  if (!permsInput) return '';
+  const arr = String(permsInput).split(',').map(p => p.trim()).filter(Boolean);
+  const valid = arr.filter(p => Object.prototype.hasOwnProperty.call(ALL_PERMS, p));
+  return [...new Set(valid)].join(',');
+};
+
 const getAll = () => all(
   'SELECT a.*,u.first_name,u.username FROM admins a LEFT JOIN users u ON a.user_id=u.id ORDER BY a.user_id'
 );
@@ -32,11 +45,14 @@ const getAdminSpecialty = async uid => {
   return r;
 };
 
+// ✅ RBAC: الافتراضي محدود عمداً (مبدأ أقل صلاحية ممكنة) وليس 'full'،
+// وأي قيمة تُمرَّر تُنظَّف عبر sanitizePerms قبل الحفظ (fail-closed ضد typos/قيم غير معروفة).
 const add = (uid, by, perms = 'upload,add_content') => {
   cacheClear('ia_' + uid); cacheClear('admp_' + uid);
+  const clean = sanitizePerms(perms) || 'upload,add_content'; // لا نحفظ أبداً سلسلة فارغة بصمت
   return run(
     'INSERT INTO admins(user_id,added_by,permissions) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET permissions=$3',
-    [uid, by, perms]
+    [uid, by, clean]
   );
 };
 
@@ -64,7 +80,8 @@ const getPerms = async uid => {
 
 const updatePerms = (uid, perms) => {
   cacheClear('admp_' + uid);
-  return run('UPDATE admins SET permissions=$1 WHERE user_id=$2', [perms, uid]);
+  const clean = sanitizePerms(perms); // فارغ = يزيل كل الصلاحيات (fail-closed) بدل حفظ قيمة غير موثوقة
+  return run('UPDATE admins SET permissions=$1 WHERE user_id=$2', [clean, uid]);
 };
 
 const clearCache = uid => {
@@ -82,4 +99,4 @@ const getAdminInfo = async uid => {
   return { isAdmin: adminStatus, perms };
 };
 
-module.exports = { ALL_PERMS, getAll, add, remove, isAdmin, getPerms, updatePerms, hasPerm, setSpecialty, getAdminSpecialty, clearCache, getAdminInfo };
+module.exports = { ALL_PERMS, getAll, add, remove, isAdmin, getPerms, updatePerms, hasPerm, setSpecialty, getAdminSpecialty, clearCache, getAdminInfo, sanitizePerms };
