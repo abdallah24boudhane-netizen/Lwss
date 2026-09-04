@@ -232,7 +232,7 @@ exports.handleCallback = async (ctx) => {
       for (const cand of ytResults.slice(0, MAX_CANDIDATES)) {
         tmpBase = path.join(TMP_DIR, `music_${Date.now()}_${cand.id}`);
         let candFile = null;
-        for (const client of [null, 'android']) {
+        for (const client of [null, 'android', 'tv_embedded']) {
           try {
             candFile = await ytDownload(cand.id, tmpBase, client);
             break;
@@ -247,7 +247,7 @@ exports.handleCallback = async (ctx) => {
               ytStderr: e.ytStderr || undefined,
             });
             cleanupTmpPrefix(tmpBase);
-            if (!e.isBotCheck) break;
+            if (e.code === 'ENOENT') break;
           }
         }
         if (!candFile) continue;
