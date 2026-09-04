@@ -704,6 +704,20 @@ module.exports = {
 // هذا السطر ما يضاف هنا — شغّل الكومند التالي مباشرة على DB
 
 // ── Migration: جداول البنك ──
+async function fixLegacyQuestionDifficulty() {
+  if (!pg) return;
+  try {
+    const r = await pg.query(
+      "UPDATE million_questions SET difficulty='medium' WHERE difficulty NOT IN ('easy','medium','hard')"
+    );
+    if (r.rowCount > 0) {
+      console.log('[FixDifficulty] ✅ صُلح ' + r.rowCount + ' سؤال كان عندهم difficulty غير صالحة (رجعوا medium).');
+    }
+  } catch (e) {
+    console.error('[FixDifficulty] ❌ ' + e.message);
+  }
+}
+
 async function runEconomyMigration() {
   const pg = getPg();
   if (!pg) return;
@@ -799,6 +813,7 @@ async function initBankTables() {
     console.log('[Bank] ✅ Tables ready');
 
     await runEconomyMigration();
+    await fixLegacyQuestionDifficulty();
 
     // ── Group Pro tables (احتياط مضمون التنفيذ) ──
     await pg.query(`CREATE TABLE IF NOT EXISTS grp_settings (

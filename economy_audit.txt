@@ -1,0 +1,114 @@
+════════ 1. bank_accounts usage (files) ════════
+./bot/callbacks.js
+./database/db.js
+./handlers/bank.js
+./handlers/bank_games.js
+./handlers/bank_pro.js
+./handlers/countries_game.js
+./handlers/game_builder.js
+./handlers/group_commands.js
+./handlers/manage.js
+./utils/backup_full.js
+
+════════ 2. bank_transactions usage (files) ════════
+./bot/callbacks.js
+./database/db.js
+./handlers/bank.js
+./handlers/bank_games.js
+./handlers/bank_pro.js
+./handlers/games_panel.js
+./handlers/manage.js
+./utils/backup_full.js
+
+════════ 3. pro_bank_accounts usage (files) ════════
+./database/db.js
+./handlers/bank_pro.js
+./handlers/countries_game.js
+./handlers/game_builder.js
+./handlers/manage.js
+./utils/backup_full.js
+
+════════ 4. pro_bank_transactions usage (files) ════════
+./database/db.js
+./handlers/bank_pro.js
+./handlers/manage.js
+./utils/backup_full.js
+
+════════ 5. سكيما الجدولين القديمين فـ db.js ════════
+711:    await pg.query('CREATE TABLE IF NOT EXISTS bank_accounts(user_id BIGINT PRIMARY KEY, username TEXT, first_name TEXT, balance NUMERIC DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)');
+712:    await pg.query('CREATE TABLE IF NOT EXISTS bank_transactions(id SERIAL PRIMARY KEY, from_id BIGINT, to_id BIGINT, amount NUMERIC, type TEXT, note TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)');
+713-    await pg.query('CREATE TABLE IF NOT EXISTS bank_loans(id SERIAL PRIMARY KEY, user_id BIGINT, amount NUMERIC, due_at TIMESTAMP, paid INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)');
+714-
+715-    await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_accounts (user_id BIGINT PRIMARY KEY, first_name TEXT DEFAULT '', username TEXT DEFAULT '', balance NUMERIC DEFAULT 0, card_type TEXT DEFAULT 'classic', account_type TEXT DEFAULT 'current', iban TEXT UNIQUE, pin TEXT DEFAULT NULL, is_frozen INTEGER DEFAULT 0, total_deposits NUMERIC DEFAULT 0, loans_count INTEGER DEFAULT 0, loans_paid INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+716-    await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_transactions (id SERIAL PRIMARY KEY, from_id BIGINT, to_id BIGINT, amount NUMERIC NOT NULL, fee NUMERIC DEFAULT 0, type TEXT DEFAULT 'transfer', note TEXT DEFAULT '', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+717-    await pg.query('CREATE INDEX IF NOT EXISTS idx_pbt_from ON pro_bank_transactions(from_id)');
+718-    await pg.query('CREATE INDEX IF NOT EXISTS idx_pbt_to ON pro_bank_transactions(to_id)');
+719-    await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_loans (id SERIAL PRIMARY KEY, user_id BIGINT NOT NULL, amount NUMERIC NOT NULL, total_due NUMERIC NOT NULL, paid INTEGER DEFAULT 0, paid_at TIMESTAMP, due_at TIMESTAMP NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+720-    await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_investments (id SERIAL PRIMARY KEY, user_id BIGINT NOT NULL, amount NUMERIC NOT NULL, daily_rate NUMERIC NOT NULL, tier TEXT DEFAULT 'أساسي', active INTEGER DEFAULT 1, profit_earned NUMERIC DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+721-    console.log('[BankPro] ✅ Tables ready');
+722-    console.log('[Bank] ✅ Tables ready');
+723-
+724-    // ── Group Pro tables (احتياط مضمون التنفيذ) ──
+725-    await pg.query(`CREATE TABLE IF NOT EXISTS grp_settings (
+726-      chat_id BIGINT PRIMARY KEY,
+727-      anti_spam BOOLEAN DEFAULT false, anti_link BOOLEAN DEFAULT false,
+
+════════ 6. سكيما الجدولين الجدد فـ db.js ════════
+715:    await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_accounts (user_id BIGINT PRIMARY KEY, first_name TEXT DEFAULT '', username TEXT DEFAULT '', balance NUMERIC DEFAULT 0, card_type TEXT DEFAULT 'classic', account_type TEXT DEFAULT 'current', iban TEXT UNIQUE, pin TEXT DEFAULT NULL, is_frozen INTEGER DEFAULT 0, total_deposits NUMERIC DEFAULT 0, loans_count INTEGER DEFAULT 0, loans_paid INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+716:    await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_transactions (id SERIAL PRIMARY KEY, from_id BIGINT, to_id BIGINT, amount NUMERIC NOT NULL, fee NUMERIC DEFAULT 0, type TEXT DEFAULT 'transfer', note TEXT DEFAULT '', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+717-    await pg.query('CREATE INDEX IF NOT EXISTS idx_pbt_from ON pro_bank_transactions(from_id)');
+718-    await pg.query('CREATE INDEX IF NOT EXISTS idx_pbt_to ON pro_bank_transactions(to_id)');
+719-    await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_loans (id SERIAL PRIMARY KEY, user_id BIGINT NOT NULL, amount NUMERIC NOT NULL, total_due NUMERIC NOT NULL, paid INTEGER DEFAULT 0, paid_at TIMESTAMP, due_at TIMESTAMP NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+720-    await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_investments (id SERIAL PRIMARY KEY, user_id BIGINT NOT NULL, amount NUMERIC NOT NULL, daily_rate NUMERIC NOT NULL, tier TEXT DEFAULT 'أساسي', active INTEGER DEFAULT 1, profit_earned NUMERIC DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+721-    console.log('[BankPro] ✅ Tables ready');
+722-    console.log('[Bank] ✅ Tables ready');
+723-
+724-    // ── Group Pro tables (احتياط مضمون التنفيذ) ──
+725-    await pg.query(`CREATE TABLE IF NOT EXISTS grp_settings (
+726-      chat_id BIGINT PRIMARY KEY,
+727-      anti_spam BOOLEAN DEFAULT false, anti_link BOOLEAN DEFAULT false,
+728-      anti_flood BOOLEAN DEFAULT false, anti_forward BOOLEAN DEFAULT false,
+729-      anti_short_link BOOLEAN DEFAULT false, anti_invite BOOLEAN DEFAULT false,
+730-      anti_new_account BOOLEAN DEFAULT false, anti_bot BOOLEAN DEFAULT false,
+731-      anti_mention BOOLEAN DEFAULT false, anti_media BOOLEAN DEFAULT false,
+
+════════ 7. كل ملفات handlers/ لي فيهم bank_accounts مع عدد المرات ════════
+handlers/bank.js:8
+handlers/bank_games.js:8
+handlers/bank_pro.js:16
+handlers/countries_game.js:3
+handlers/game_builder.js:3
+handlers/group_commands.js:5
+handlers/manage.js:21
+bot/callbacks.js:10
+
+════════ 8. كل ملفات handlers/ لي فيهم pro_bank_accounts مع عدد المرات ════════
+handlers/bank_pro.js:16
+handlers/countries_game.js:3
+handlers/game_builder.js:3
+handlers/manage.js:17
+
+════════ 9. مصادر Points/XP ════════
+database/db.js
+database/interactions.js
+database/points.js
+database/xp.js
+handlers/add.js
+handlers/bank_games.js
+handlers/browse.js
+handlers/game_guess.js
+handlers/group_info_panel.js
+handlers/group_pro.js
+handlers/million.js
+handlers/million_battle.js
+handlers/nations.js
+handlers/profile.js
+handlers/summarize.js
+handlers/user.js
+handlers/xp.js
+bot/callbacks.js
+bot/commands.js
+
+════════ 10. استخدام رمز $ فرسائل البوت (بدل DA) ════════
+handlers/bank_games.js:36:  if(!bet||bet<100) return ctx.reply('🎲 *قلب العملة*\n\nالاستخدام: /flip [مبلغ]\nمثال: /flip 500\nالحد الأدنى: 100$', { reply_to_message_id: ctx.message?.message_id, parse_mode:'Markdown'}).catch(()=>{});
+bot/messages.js:277:          const ph   = rows.map((_, ri) => '(' + cols.map((_, ci) => '$' + (ri * cols.length + ci + 1)).join(',') + ')').join(',');

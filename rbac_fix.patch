@@ -1,0 +1,958 @@
+diff --git a/bot/callbacks.js b/bot/callbacks.js
+index b421817..fc3a5f9 100644
+--- a/bot/callbacks.js
++++ b/bot/callbacks.js
+@@ -28,10 +28,12 @@ module.exports.registerCallbacks = function(bot, deps) {
+   const { run: dbRun, all: dbAll } = require('../database/db');
+   const filesDb  = require('../database/files');
+   const million  = require('../handlers/million');
++  const { botRequirePerm } = require('../middlewares/rbac'); // ✅ RBAC مركزي
+ 
+   // ── Helpers ──
+   async function hGrpSp(ctx, d) {
+-    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
++    // ✅ RBAC: كانت owner-only بدون سبب رغم وجود صلاحية 'manage_groups' مخصصة لإدارة القروبات.
++    if (!(await botRequirePerm(ctx, 'manage_groups'))) return;
+     const r = d.substring(7), i = r.lastIndexOf('_');
+     const cid = parseInt(r.substring(0, i)), sid = parseInt(r.substring(i + 1));
+     try {
+@@ -44,7 +46,8 @@ module.exports.registerCallbacks = function(bot, deps) {
+   }
+ 
+   async function hGrpDl(ctx, d) {
+-    if (!ctx.isOwner) return ctx.answerCbQuery('🚫').catch(() => {});
++    // ✅ RBAC: كانت owner-only بدون سبب — نفس فئة إجراءات إدارة القروبات.
++    if (!(await botRequirePerm(ctx, 'manage_groups'))) return;
+     // ✅ رد فوري على الزر
+     ctx.answerCbQuery('📤 جاري الإرسال...').catch(() => {});
+     try {
+@@ -60,7 +63,8 @@ module.exports.registerCallbacks = function(bot, deps) {
+   }
+ 
+   async function hSearchDel(ctx, d) {
+-    if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
++    // ✅ RBAC: كان يكفي isAdmin ثنائي — الآن يتطلب صلاحية 'delete' تحديداً.
++    if (!(await botRequirePerm(ctx, 'delete'))) return;
+     const p = d.substring(11).split('|'), fid = p[0], q = decodeURIComponent(p[1] || '');
+     await filesDb.softDelete(fid);
+     cacheClearPrefix('search_');
+@@ -157,7 +161,8 @@ module.exports.registerCallbacks = function(bot, deps) {
+   const prefR = [
+     // Bundle
+     { p: 'bundle_del_file_',  fn: async (ctx, d) => {
+-      if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
++      // ✅ RBAC: صلاحية 'delete' تحديداً بدل isAdmin الثنائي.
++      if (!(await botRequirePerm(ctx, 'delete'))) return;
+       const p = d.substring(16).split('_'), bid = parseInt(p[0]), fid = parseInt(p[1]);
+       try {
+         await bundlesDb.removeBundleFile(bid, fid);
+@@ -170,13 +175,15 @@ module.exports.registerCallbacks = function(bot, deps) {
+       } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
+     }},
+     { p: 'bundle_add_files_', fn: async (ctx, d) => {
+-      if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
++      // ✅ RBAC: صلاحية 'upload' تحديداً بدل isAdmin الثنائي.
++      if (!(await botRequirePerm(ctx, 'upload'))) return;
+       const bid = parseInt(d.substring(17));
+       await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_bundle_files', bundleId: bid, fileCount: 0 });
+       return ctx.reply('📦 أرسل الملفات الآن.\n/done للإنهاء').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+     }},
+     { p: 'bundle_delete_',    fn: async (ctx, d) => {
+-      if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
++      // ✅ RBAC: كانت owner-only — أصبحت مربوطة بصلاحية 'delete' (نفس فئة حذف الملفات، Owner مسموح دائماً).
++      if (!(await botRequirePerm(ctx, 'delete'))) return;
+       const bid = parseInt(d.substring(14));
+       try { await bundlesDb.deleteBundle(bid); await ctx.answerCbQuery('✅ تم حذف الحزمة').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); return ctx.reply('✅ تم حذف الحزمة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
+       catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
+@@ -499,7 +506,8 @@ module.exports.registerCallbacks = function(bot, deps) {
+       return;
+     }},
+     { p: 'leave_grp_', fn: async (ctx, d) => {
+-      if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
++      // ✅ RBAC: كانت owner-only — أصبحت مربوطة بصلاحية 'manage_groups' (Owner مسموح دائماً).
++      if (!(await botRequirePerm(ctx, 'manage_groups'))) return;
+       const chatId = parseInt(d.substring(10));
+       try {
+         await ctx.telegram.leaveChat(chatId);
+diff --git a/database/admins.js b/database/admins.js
+index b54380d..9a78ca2 100644
+--- a/database/admins.js
++++ b/database/admins.js
+@@ -15,6 +15,19 @@ const ALL_PERMS = {
+   'full':         '👑 صلاحيات كاملة',
+ };
+ 
++/**
++ * ✅ RBAC hardening: ينظّف/يتحقق من صحة سلسلة الصلاحيات قبل حفظها.
++ * أي قيمة غير معرّفة ضمن ALL_PERMS تُرفض بصمت (fail-closed) بدل أن تُحفظ
++ * كصلاحية "شبح" غير معروفة يمكن أن تُفسَّر لاحقاً بشكل غير متوقع.
++ * لا تسمح بإدخال 'full' ضمنياً — 'full' يجب أن يُطلب صراحة.
++ */
++const sanitizePerms = (permsInput) => {
++  if (!permsInput) return '';
++  const arr = String(permsInput).split(',').map(p => p.trim()).filter(Boolean);
++  const valid = arr.filter(p => Object.prototype.hasOwnProperty.call(ALL_PERMS, p));
++  return [...new Set(valid)].join(',');
++};
++
+ const getAll = () => all(
+   'SELECT a.*,u.first_name,u.username FROM admins a LEFT JOIN users u ON a.user_id=u.id ORDER BY a.user_id'
+ );
+@@ -32,11 +45,14 @@ const getAdminSpecialty = async uid => {
+   return r;
+ };
+ 
++// ✅ RBAC: الافتراضي محدود عمداً (مبدأ أقل صلاحية ممكنة) وليس 'full'،
++// وأي قيمة تُمرَّر تُنظَّف عبر sanitizePerms قبل الحفظ (fail-closed ضد typos/قيم غير معروفة).
+ const add = (uid, by, perms = 'upload,add_content') => {
+   cacheClear('ia_' + uid); cacheClear('admp_' + uid);
++  const clean = sanitizePerms(perms) || 'upload,add_content'; // لا نحفظ أبداً سلسلة فارغة بصمت
+   return run(
+     'INSERT INTO admins(user_id,added_by,permissions) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET permissions=$3',
+-    [uid, by, perms]
++    [uid, by, clean]
+   );
+ };
+ 
+@@ -64,7 +80,8 @@ const getPerms = async uid => {
+ 
+ const updatePerms = (uid, perms) => {
+   cacheClear('admp_' + uid);
+-  return run('UPDATE admins SET permissions=$1 WHERE user_id=$2', [perms, uid]);
++  const clean = sanitizePerms(perms); // فارغ = يزيل كل الصلاحيات (fail-closed) بدل حفظ قيمة غير موثوقة
++  return run('UPDATE admins SET permissions=$1 WHERE user_id=$2', [clean, uid]);
+ };
+ 
+ const clearCache = uid => {
+@@ -82,4 +99,4 @@ const getAdminInfo = async uid => {
+   return { isAdmin: adminStatus, perms };
+ };
+ 
+-module.exports = { ALL_PERMS, getAll, add, remove, isAdmin, getPerms, updatePerms, hasPerm, setSpecialty, getAdminSpecialty, clearCache, getAdminInfo };
++module.exports = { ALL_PERMS, getAll, add, remove, isAdmin, getPerms, updatePerms, hasPerm, setSpecialty, getAdminSpecialty, clearCache, getAdminInfo, sanitizePerms };
+diff --git a/handlers/manage.js b/handlers/manage.js
+index a870b2a..cd80c01 100644
+--- a/handlers/manage.js
++++ b/handlers/manage.js
+@@ -3,6 +3,7 @@ const content=require('../database/content');
+ const bundlesDb=require('../database/bundles');
+ const filesDb=require('../database/files');
+ const adminsDb=require('../database/admins');
++const { botRequirePerm } = require('../middlewares/rbac'); // ✅ RBAC مركزي — نفس نظام الصلاحيات الموجود في database/admins.js
+ const usersDb=require('../database/users');
+ const interactions=require('../database/interactions');
+ const browse=require('./browse');
+@@ -504,7 +505,10 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
+         ctx.reply('✅ تم حفظ رسالة /start!'+(state.mediaFileId ? ' (مع '+(state.mediaType==='photo'?'صورة':'فيديو')+')' : ''),{parse_mode:'Markdown'}).catch(()=>{});
+         return handleCallback(ctx,'mg_bot_settings');
+       }
+-      case 'mg_broadcast':{clearState(uid);const ids=await usersDb.allIds();const total_bc=ids.length;const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});const bcRes=await concurrentBroadcast(ctx.telegram,ctx.chat.id,sm.message_id,ids,'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+bcRes.sent+' | ❌ '+bcRes.failed,{...build([back('mg_menu')]),parse_mode:'Markdown'}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });break;}
++      // 🛡️ دفاع إضافي (defense-in-depth): إعادة التحقق من الصلاحية وقت التنفيذ الفعلي
++      // للبث، وليس فقط عند بدء الحوار — يحمي من أي حالة نادرة تُغيَّر فيها صلاحيات
++      // المستخدم بين لحظة الضغط على الزر ولحظة إرسال نص البث.
++      case 'mg_broadcast':{clearState(uid);if(!(await botRequirePerm(ctx,'broadcast'))) break;const ids=await usersDb.allIds();const total_bc=ids.length;const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});const bcRes=await concurrentBroadcast(ctx.telegram,ctx.chat.id,sm.message_id,ids,'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+bcRes.sent+' | ❌ '+bcRes.failed,{...build([back('mg_menu')]),parse_mode:'Markdown'}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });break;}
+       case 'mg_msg_user_id':{setState(uid,{...state,type:'mg_msg_user_content',targetId:text.replace('@','')});ctx.reply('📝 ارسل الرسالة (نص، صورة، فيديو، sticker، voice):',{parse_mode:'Markdown',...build([[btn('❌ إلغاء','mg_menu')]])});break;}
+       case 'mg_msg_user_content':{
+         clearState(uid);
+@@ -558,7 +562,8 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
+         ctx.reply('✅ أُرسل لـ *'+gSent+'* قروب'+(gFail?' | ❌ '+gFail:''),{parse_mode:'Markdown',...build([back('mg_menu')])});
+         break;}
+       case 'mg_notify_msg':{clearState(uid);const nIds=await interactions.getActiveUsers(7);await safeAdd(broadcastQueue,'broadcast-all',{userIds:nIds,message:'🔔 *إشعار*\n\n'+text,parseMode:'Markdown',fromUid:uid});ctx.reply('📤 جاري الإرسال لـ *'+nIds.length+'* مستخدم — ستصلك النتيجة لما ينتهي',{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
+-      case 'mg_add_admin_id':{const tid=parseInt(text);if(isNaN(tid)){clearState(uid);return ctx.reply('❌ ID غير صحيح.');}await adminsDb.add(tid,uid);await interactions.addLog(uid,'add_admin','ID: '+tid);if(global.invalidateAdmin) global.invalidateAdmin(tid);const specs=await content.getSpecs();const spRows=specs.map(s=>[btn('🎓 '+s.name,'mg_admin_sp_'+tid+'_'+s.id)]);spRows.push([btn('كل التخصصات','mg_admin_sp_'+tid+'_0')]);clearState(uid);ctx.reply('اختر تخصص المشرف:',{...build(spRows)});try{ctx.telegram.sendMessage(tid,'🎉 تمت إضافتك مشرفاً',{parse_mode:'Markdown'});}catch(_){}break;}
++      // 🛡️ دفاع إضافي: إعادة تحقق Owner وقت التنفيذ الفعلي لإضافة الأدمن، وليس فقط عند بدء الحوار.
++      case 'mg_add_admin_id':{if(!ctx.isOwner){clearState(uid);return ctx.answerCbQuery?null:ctx.reply('🚫 للمالك فقط.');}const tid=parseInt(text);if(isNaN(tid)){clearState(uid);return ctx.reply('❌ ID غير صحيح.');}await adminsDb.add(tid,uid);await interactions.addLog(uid,'add_admin','ID: '+tid);if(global.invalidateAdmin) global.invalidateAdmin(tid);const specs=await content.getSpecs();const spRows=specs.map(s=>[btn('🎓 '+s.name,'mg_admin_sp_'+tid+'_'+s.id)]);spRows.push([btn('كل التخصصات','mg_admin_sp_'+tid+'_0')]);clearState(uid);ctx.reply('اختر تخصص المشرف:',{...build(spRows)});try{ctx.telegram.sendMessage(tid,'🎉 تمت إضافتك مشرفاً',{parse_mode:'Markdown'});}catch(_){}break;}
+       case 'mg_maint_msg':{
+         await require('../database/db').setSetting('maintenance_msg', text);
+         global._maintMsgCache = null; // إبطال الكاش فوراً
+@@ -1105,8 +1110,10 @@ if(data==='mg_auto_replies') return showAutoReplies(ctx);
+   }
+   if(data==='mg_analytics') return showAnalytics(ctx);
+   if(data==='mg_logs') return showLogs(ctx);
+-  if(data==='mg_users'){try{const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('view_users')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});return await showUsers(ctx);}catch(e){console.error('[mg_users]',e.message);return ctx.reply('❌ خطأ: '+e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });}}
+-  if(data==='mg_admins') return showAdmins(ctx);
++  if(data==='mg_users'){try{if(!(await botRequirePerm(ctx,'view_users'))) return; return await showUsers(ctx);}catch(e){console.error('[mg_users]',e.message);return ctx.reply('❌ خطأ: '+e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });}}
++  // 🔒 إدارة الأدمنية (عرض/إضافة/حذف/تعديل صلاحيات) — Owner فقط دائماً، بلا استثناء،
++  // لمنع أي أدمن (حتى لو "full") من التلاعب بقائمة الأدمنية نفسها (privilege escalation).
++  if(data==='mg_admins'){ if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{}); return showAdmins(ctx); }
+   if(data==='mg_trash') return showTrash(ctx);
+   if(data==='mg_search_prompt'){setState(uid,{type:'mg_admin_search'});return ctx.reply('🔍 بحث:\nأدخل اسم ملف أو مستخدم:');}
+   // ══════════════════════════════════════
+@@ -1263,7 +1270,10 @@ if(data==='mg_auto_replies') return showAutoReplies(ctx);
+   }
+ 
+ 
++  // 🔒 إضافة/تعديل رصيد بنكي يدوياً — Owner فقط. لا صلاحية أدمن مخصصة لهذا ضمن
++  // ALL_PERMS الحالية؛ Fail-closed يعني: بدون صلاحية معرّفة صراحة = Owner فقط، وليس "مسموح افتراضياً".
+   if(data==='mg_bank_add') {
++    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});
+     setState(uid, { type: 'mg_bank_add_id' });
+     return eos(ctx,
+       '🏦 *إضافة رصيد يدوي*\n\n' +
+@@ -1273,6 +1283,7 @@ if(data==='mg_auto_replies') return showAutoReplies(ctx);
+   }
+ 
+     if(data==='mg_bank_top'){
++    if(!(await botRequirePerm(ctx,'view_users'))) return;
+     const { all } = require('../database/db');
+     const top = await all('SELECT first_name, balance FROM bank_accounts ORDER BY balance DESC LIMIT 10').catch(()=>[]);
+     let text = '🏆 *أغنى المستخدمين*\n━━━━━━━━━━━━━━━━━━━━\n\n';
+@@ -1327,7 +1338,9 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
+     global._maintMsgCache=null;
+     return showMaintPanel(ctx);
+   }
++  // 🔒 نسخ احتياطي كامل لقاعدة البيانات — يحتوي بيانات كل المستخدمين. Owner فقط.
+   if(data==='mg_backup'){
++    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});
+     const msg = await ctx.reply('⏳ جاري تصدير كل البيانات (قد يستغرق دقيقة)...').catch(()=>{});
+     try {
+       const { exportAll } = require('../utils/backup_full');
+@@ -1355,7 +1368,9 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
+     }
+     return;
+   }
++  // 🔒 إعدادات البوت العامة (تؤثر على كل المستخدمين) — Owner فقط.
+   if(data==='mg_bot_settings'){
++    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});
+     const wt=await require('../database/db').getSetting('start_welcome_text').catch(()=>null);
+     const preview=wt?wt.substring(0,150):'_غير مفعّل_';
+     const r2=[[btn('✏️ تعديل رسالة /start','mg_edit_welcome')]];
+@@ -1363,7 +1378,9 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
+     r2.push(back('mg_menu'));
+     return eos(ctx,'⚙️ *إعدادات البوت*'+String.fromCharCode(10)+'━━━━━━━━━━━━━━━'+String.fromCharCode(10)+'📝 *رسالة /start:*'+String.fromCharCode(10)+preview,{parse_mode:'Markdown',...build(r2)});}
+ 
++  // 🔒 تعديل/حذف رسالة /start العامة (تؤثر على كل المستخدمين الجدد) — جزء من إعدادات البوت، Owner فقط.
+   if(data==='mg_edit_welcome'){
++    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});
+     setState(uid,{type:'mg_set_welcome'});
+     const VARS = '📝 *المتغيرات المتاحة:*\n'+
+       '`{name}` الاسم | `{username}` يوزر\n'+
+@@ -1382,15 +1399,21 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
+     ).catch(()=>{});
+   }
+ 
+-  if(data==='mg_del_welcome'){await require('../database/db').run("DELETE FROM settings WHERE key IN ('start_welcome_text','start_welcome_media_id','start_welcome_media_type')").catch(()=>{});ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});return handleCallback(ctx,'mg_bot_settings');}
+-
+-  if(data==='mg_restore'){setState(uid,{type:'mg_awaiting_restore'});return eos(ctx,'♻️ *استعادة كاملة*\n\n⚠️ سيُستبدل كل شيء: مستخدمين، ملفات، بنك، ألعاب، حماية، ردود تلقائية!\n\nأرسل ملف `.json` من "نسخ احتياطي":',{parse_mode:'Markdown',...build([back('mg_menu')])});}
+-  if(data==='mg_broadcast'){setState(uid,{type:'mg_broadcast'});return ctx.reply('📢 رسالة البث:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
+-  if(data==='mg_add_admin'){setState(uid,{type:'mg_add_admin_id'});return ctx.reply('👤 ID المستخدم:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
+-  if(data.startsWith('mg_admin_sp_')){const p=data.replace('mg_admin_sp_','').split('_');await adminsDb.setSpecialty(p[0],p[1]);return eos(ctx,'✅ تم تحديد التخصص',{...build([back('mg_admins')])});}
+-  if(data.startsWith('mg_da_')){const rid=parseInt(data.replace('mg_da_',''));await adminsDb.remove(rid);if(global.invalidateAdmin)global.invalidateAdmin(rid);return showAdmins(ctx);}
+-  if(data.startsWith('mg_ep_')) return showEditPerms(ctx,data.replace('mg_ep_',''));
+-  if(data.startsWith('mg_tp_')){const p=data.replace('mg_tp_','').split('_');const adminId=p[0];const perm=p.slice(1).join('_');const list=await adminsDb.getAll();const admin=list.find(a=>a.user_id==adminId);if(!admin) return ctx.answerCbQuery('❌').catch(()=>{});let perms=(admin.permissions||'').split(',').map(x=>x.trim()).filter(Boolean);if(perms.includes(perm)) perms=perms.filter(x=>x!==perm);else{if(perm==='full') perms=['full'];else{perms=perms.filter(x=>x!=='full');perms.push(perm);}}await adminsDb.updatePerms(adminId,perms.join(','));return showEditPerms(ctx,adminId);}
++  if(data==='mg_del_welcome'){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});await require('../database/db').run("DELETE FROM settings WHERE key IN ('start_welcome_text','start_welcome_media_id','start_welcome_media_type')").catch(()=>{});ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});return handleCallback(ctx,'mg_bot_settings');}
++
++  if(data==='mg_restore'){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});setState(uid,{type:'mg_awaiting_restore'});return eos(ctx,'♻️ *استعادة كاملة*\n\n⚠️ سيُستبدل كل شيء: مستخدمين، ملفات، بنك، ألعاب، حماية، ردود تلقائية!\n\nأرسل ملف `.json` من "نسخ احتياطي":',{parse_mode:'Markdown',...build([back('mg_menu')])});}
++  // 📢 البث للكل — مربوط بصلاحية 'broadcast' الموجودة في ALL_PERMS (Owner مسموح دائماً تلقائياً).
++  if(data==='mg_broadcast'){if(!(await botRequirePerm(ctx,'broadcast'))) return;setState(uid,{type:'mg_broadcast'});return ctx.reply('📢 رسالة البث:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
++  // 🔒 كل ما يخص إدارة "الأدمنية أنفسهم" (إضافة/حذف/تحديد تخصص/تعديل صلاحيات) — Owner فقط دائماً.
++  // هذا يمنع بالتحديد سيناريو privilege escalation: أدمن يمنح نفسه أو غيره صلاحية 'full'.
++  if(data==='mg_add_admin'){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});setState(uid,{type:'mg_add_admin_id'});return ctx.reply('👤 ID المستخدم:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
++  if(data.startsWith('mg_admin_sp_')){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});const p=data.replace('mg_admin_sp_','').split('_');await adminsDb.setSpecialty(p[0],p[1]);return eos(ctx,'✅ تم تحديد التخصص',{...build([back('mg_admins')])});}
++  if(data.startsWith('mg_da_')){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});const rid=parseInt(data.replace('mg_da_',''));await adminsDb.remove(rid);if(global.invalidateAdmin)global.invalidateAdmin(rid);return showAdmins(ctx);}
++  if(data.startsWith('mg_ep_')){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{}); return showEditPerms(ctx,data.replace('mg_ep_',''));}
++  // 🔒🔴 الأهم أمنياً: هذا الزر يُبدّل صلاحيات أدمن (بما فيها منح 'full'). كان بلا أي حماية
++  // خاصة به سوى فحص isAdmin الخارجي — أي أدمن كان يستطيع نظرياً تعديل صلاحيات أدمن آخر
++  // (أو حتى صلاحياته هو لو توفّر له الزر) عبر هذا المسار. الآن Owner فقط، بلا استثناء.
++  if(data.startsWith('mg_tp_')){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط',{show_alert:true}).catch(()=>{});const p=data.replace('mg_tp_','').split('_');const adminId=p[0];const perm=p.slice(1).join('_');const list=await adminsDb.getAll();const admin=list.find(a=>a.user_id==adminId);if(!admin) return ctx.answerCbQuery('❌').catch(()=>{});let perms=(admin.permissions||'').split(',').map(x=>x.trim()).filter(Boolean);if(perms.includes(perm)) perms=perms.filter(x=>x!==perm);else{if(perm==='full') perms=['full'];else{perms=perms.filter(x=>x!=='full');perms.push(perm);}}await adminsDb.updatePerms(adminId,perms.join(','));return showEditPerms(ctx,adminId);}
+   if(data.startsWith('mg_profile_')) return showUserProfile(ctx,data.replace('mg_profile_',''));
+ 
+   // ── تواصل مع مستخدم ──
+@@ -1419,8 +1442,9 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
+     return showUsers(ctx, pg, filter);
+   }
+   if(data.startsWith('mg_restore_fl_')){await filesDb.restore(data.replace('mg_restore_fl_',''));return showTrash(ctx);}
+-  if(data==='mg_empty_trash'){return eos(ctx,'⚠️ حذف الكل نهائياً؟',build([[btn('✅ تأكيد','mg_confirm_empty')],[btn('❌ إلغاء','mg_trash')]]));}
+-  if(data==='mg_confirm_empty'){await dbRun('DELETE FROM files WHERE is_deleted=1');return eos(ctx,'✅ تم حذف السلة!',{parse_mode:'Markdown',...build([back('mg_menu')])});}
++  // 🗑 حذف نهائي دائم (لا رجوع) — مربوط بصلاحية 'delete' الموجودة (Owner مسموح دائماً).
++  if(data==='mg_empty_trash'){if(!(await botRequirePerm(ctx,'delete'))) return;return eos(ctx,'⚠️ حذف الكل نهائياً؟',build([[btn('✅ تأكيد','mg_confirm_empty')],[btn('❌ إلغاء','mg_trash')]]));}
++  if(data==='mg_confirm_empty'){if(!(await botRequirePerm(ctx,'delete'))) return;await dbRun('DELETE FROM files WHERE is_deleted=1');return eos(ctx,'✅ تم حذف السلة!',{parse_mode:'Markdown',...build([back('mg_menu')])});}
+   if(data.startsWith('mg_yrs_')) return showYears(ctx,data.replace('mg_yrs_',''));
+   if(data.startsWith('mg_sems_')){const p=data.replace('mg_sems_','').split('_');return showSemesters(ctx,p[0],p[1]);}
+   if(data.startsWith('mg_sbs_')){const p=data.replace('mg_sbs_','').split('_');return showSubjects(ctx,p[0],p[1],p[2]);}
+@@ -1451,11 +1475,11 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
+   if(data.startsWith('mg_dl_bundle_')){const p=data.replace('mg_dl_bundle_','').split('_');const _bId=parseInt(p[0]),_bCat=parseInt(p[1]);await bundlesDb.deleteBundle(_bId);const {cacheClearPrefix:ccp,cacheClear:cc}=require('../utils/cache');ccp('showfiles_'+_bCat);cc('bdls_'+_bCat);cc('bundle_full_'+_bId);await ctx.answerCbQuery('✅ تم حذف الحزمة').catch(err => { require('../utils/logger').debug("[silent]", err.message); });return browse.showFiles(ctx,p[2],p[3],p[4],p[5],p[1],0);}
+   if(data.startsWith('mg_rn_bundle_')){const p=data.replace('mg_rn_bundle_','').split('_');setState(uid,{type:'mg_rename_bundle',bundleId:p[0],catId:p[1],spId:p[2],yrId:p[3],smId:p[4],sbId:p[5]});return ctx.reply('✏️ الاسم الجديد:');}
+   if(data.startsWith('mg_add_bundle_')){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط.',{show_alert:true});const p=data.replace('mg_add_bundle_','').split('_');setState(uid,{type:'mg_bundle_title',spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('📦 اسم الحزمة:');}
+-  if(data.startsWith('mg_upl_bulk_')){const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('upload')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});const pr=data.replace('mg_upl_bulk_','').split('_');setState(uid,{type:'mg_bulk_prefix',spId:pr[0],yrId:pr[1],smId:pr[2],sbId:pr[3],catId:pr[4]});return ctx.reply('رفع متعدد — بادئة للأسماء؟ أو skip:');}
+-  if(data.startsWith('mg_upl_')){const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('upload')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});const pr=data.replace('mg_upl_','').split('_');setState(uid,{type:'mg_upl_title',spId:pr[0],yrId:pr[1],smId:pr[2],sbId:pr[3],catId:pr[4]});return ctx.reply('✏️ عنوان الملف:');}
++  if(data.startsWith('mg_upl_bulk_')){if(!(await botRequirePerm(ctx,'upload'))) return;const pr=data.replace('mg_upl_bulk_','').split('_');setState(uid,{type:'mg_bulk_prefix',spId:pr[0],yrId:pr[1],smId:pr[2],sbId:pr[3],catId:pr[4]});return ctx.reply('رفع متعدد — بادئة للأسماء؟ أو skip:');}
++  if(data.startsWith('mg_upl_')){if(!(await botRequirePerm(ctx,'upload'))) return;const pr=data.replace('mg_upl_','').split('_');setState(uid,{type:'mg_upl_title',spId:pr[0],yrId:pr[1],smId:pr[2],sbId:pr[3],catId:pr[4]});return ctx.reply('✏️ عنوان الملف:');}
+   if(data.startsWith('mg_rn_fl_')){const p=data.replace('mg_rn_fl_','').split('_');setState(uid,{type:'mg_rn_fl',id:p[5],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('✏️ العنوان الجديد:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
+   if(data.startsWith('mg_desc_fl_')){const p=data.replace('mg_desc_fl_','').split('_');setState(uid,{type:'mg_desc_fl',id:p[5],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('📝 الوصف الجديد:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
+-  if(data.startsWith('mg_dl_fl_')){const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('delete')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});const pr=data.replace('mg_dl_fl_','').split('_');const f=await filesDb.getFile(pr[5]);return eos(ctx,'🗑 نقل *'+escMd(f?.title||'الملف')+'* للسلة؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_fl_'+pr.join('_')),btn('❌ لا','mg_fls_'+pr.slice(0,5).join('_'))]])});}
++  if(data.startsWith('mg_dl_fl_')){if(!(await botRequirePerm(ctx,'delete'))) return;const pr=data.replace('mg_dl_fl_','').split('_');const f=await filesDb.getFile(pr[5]);return eos(ctx,'🗑 نقل *'+escMd(f?.title||'الملف')+'* للسلة؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_fl_'+pr.join('_')),btn('❌ لا','mg_fls_'+pr.slice(0,5).join('_'))]])});}
+   if(data.startsWith('mg_cdl_fl_')){const p=data.replace('mg_cdl_fl_','').split('_');await filesDb.softDelete(p[5]);return showMgFiles(ctx,p[0],p[1],p[2],p[3],p[4]);}
+   }catch(e){console.error('[CB]',e.message);ctx.reply('❌ '+e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });}
+ }
+diff --git a/middlewares/rbac.js b/middlewares/rbac.js
+new file mode 100644
+index 0000000..255a671
+--- /dev/null
++++ b/middlewares/rbac.js
+@@ -0,0 +1,158 @@
++'use strict';
++/**
++ * ════════════════════════════════════════════════════════════
++ *  🔐 middlewares/rbac.js — Centralized RBAC (Role-Based Access Control)
++ * ════════════════════════════════════════════════════════════
++ *
++ * هدف هذا الملف: نقطة واحدة موثوقة لفحص الصلاحيات، تُستخدم من:
++ *   - Express API admin routes  (routes/api.js)          → requirePerm(perm)
++ *   - Telegraf bot commands     (bot/commands.js)         → botRequirePerm(perm)
++ *   - Telegraf bot callbacks    (bot/callbacks.js, handlers/manage.js) → checkPerm(ctx, perm)
++ *
++ * ⚠️ لا يُعرَّف نظام صلاحيات جديد هنا — هذا الملف طبقة رقيقة (thin wrapper)
++ * فوق database/admins.js (ALL_PERMS + hasPerm) الموجود مسبقاً في المشروع،
++ * حسب طلب "استخدم نظام الصلاحيات الموجود قدر الإمكان".
++ *
++ * قواعد التصميم (غير قابلة للكسر):
++ *   1) Deny-by-default / Fail-closed: أي خطأ، استثناء، أو صلاحية غير معروفة → DENY.
++ *   2) Owner دائماً لديه كل الصلاحيات (isOwner من auth.js — لا تغيير على هذا).
++ *   3) صلاحية 'full' تُعطي كل شيء لأي أدمن يملكها فعلاً (سلوك موجود مسبقاً، محفوظ كما هو).
++ *   4) لا صلاحية 'full' تلقائية عند الإضافة بدون تحديد — يجب أن تُمنح صراحة.
++ *   5) أي permission string غير موجود ضمن ALL_PERMS → يُرفض فوراً (fail-closed)
++ *      لمنع أخطاء الكتابة (typos) من فتح ثغرات صلاحيات بصمت.
++ */
++
++const { ALL_PERMS, hasPerm } = require('../database/admins');
++const { isOwner } = require('./auth');
++const logger = require('../utils/logger');
++
++const VALID_PERMS = new Set(Object.keys(ALL_PERMS));
++
++/**
++ * تحقق أساسي من صلاحية واحدة لمستخدم معيّن.
++ * fail-closed: أي خطأ أثناء الفحص = false (رفض)، وليس exception يفلت بصمت.
++ */
++async function checkPermission(uid, perm) {
++  try {
++    if (!uid) return false;
++
++    // ✅ Owner دائماً مسموح — يطابق تصميم المشروع الحالي
++    if (isOwner(uid)) return true;
++
++    // ✅ fail-closed: صلاحية غير معرّفة في ALL_PERMS = رفض فوري (يمنع typos من فتح ثغرات)
++    if (!VALID_PERMS.has(perm)) {
++      logger.error(`[RBAC] Unknown permission requested: "${perm}" — denying by default (fail-closed).`);
++      return false;
++    }
++
++    return await hasPerm(uid, perm);
++  } catch (e) {
++    logger.error('[RBAC] checkPermission error (fail-closed → deny):', e.message);
++    return false; // ✅ أي استثناء = رفض، لا نمرر بصمت
++  }
++}
++
++/**
++ * تحقق سريع من ctx الخاص بالبوت (Telegraf) بدون استعلام إضافي إذا كان
++ * middlewares/auth.js قد حمّل ctx.isOwner / ctx.adminPerms مسبقاً (fast path).
++ * إن لم تكن محمّلة (نادراً)، يرجع لاستعلام DB مباشر كـ fallback آمن.
++ */
++async function checkPerm(ctx, perm) {
++  try {
++    const uid = ctx?.uid || ctx?.from?.id;
++    if (!uid) return false;
++
++    if (ctx.isOwner === true) return true;
++
++    if (!VALID_PERMS.has(perm)) {
++      logger.error(`[RBAC] Unknown permission requested from bot ctx: "${perm}" — denying.`);
++      return false;
++    }
++
++    // Fast path: الصلاحيات محمّلة مسبقاً من middlewares/auth.js على كل تحديث
++    if (Array.isArray(ctx.adminPerms)) {
++      return ctx.adminPerms.includes('full') || ctx.adminPerms.includes(perm);
++    }
++
++    // Fallback نادر: لو لسبب ما ctx.adminPerms غير محمّلة، اسأل DB مباشرة (نفس المصدر الوحيد للحقيقة)
++    return await checkPermission(uid, perm);
++  } catch (e) {
++    logger.error('[RBAC] checkPerm(ctx) error (fail-closed → deny):', e.message);
++    return false;
++  }
++}
++
++/**
++ * Express middleware factory — يُستخدم في routes/api.js:
++ *   router.post('/admin/ban/:id', auth, requirePerm('ban_users'), handler)
++ *
++ * يتوقع أن `auth` middleware (verifyWebApp) قد نفّذ قبله ووضع req.tgUser.
++ */
++function requirePerm(perm) {
++  return async (req, res, next) => {
++    try {
++      const uid = parseInt(req.tgUser?.id);
++      if (!uid) return res.status(401).json({ error: 'Unauthorized' });
++
++      const allowed = await checkPermission(uid, perm);
++      if (!allowed) {
++        logger.warn(`[RBAC] DENY uid=${uid} perm="${perm}" path=${req.originalUrl}`);
++        return res.status(403).json({ error: 'forbidden', required_permission: perm });
++      }
++      req.rbacPerm = perm; // للتوثيق/الـ logging اللاحق إن احتجنا
++      next();
++    } catch (e) {
++      logger.error('[RBAC] requirePerm middleware error (fail-closed → 403):', e.message);
++      return res.status(403).json({ error: 'forbidden' }); // fail-closed حتى عند خطأ غير متوقع
++    }
++  };
++}
++
++/**
++ * Express middleware — Owner فقط (للعمليات شديدة الحساسية: إدارة الأدمنية أنفسهم).
++ */
++function requireOwner() {
++  return (req, res, next) => {
++    const uid = parseInt(req.tgUser?.id);
++    if (!uid || !isOwner(uid)) {
++      logger.warn(`[RBAC] DENY (owner-only) uid=${uid} path=${req.originalUrl}`);
++      return res.status(403).json({ error: 'owner only' });
++    }
++    next();
++  };
++}
++
++/**
++ * Telegraf helper لأوامر البوت (bot/commands.js) — يرد تلقائياً برسالة رفض عند عدم وجود الصلاحية.
++ * الاستخدام:
++ *   bot.command('addfile', async ctx => {
++ *     if (!(await botRequirePerm(ctx, 'upload'))) return;
++ *     ...
++ *   });
++ * يرجع true إذا مسموح، false إذا رُفض (ويكون قد أرسل رسالة الرفض تلقائياً).
++ */
++async function botRequirePerm(ctx, perm, opts = {}) {
++  const allowed = await checkPerm(ctx, perm);
++  if (!allowed) {
++    const msg = opts.silent ? null : (opts.message || '🚫 ليس لديك صلاحية لتنفيذ هذا الإجراء.');
++    if (msg) {
++      if (ctx.callbackQuery) {
++        await ctx.answerCbQuery(msg, { show_alert: true }).catch(() => {});
++      } else {
++        await ctx.reply(msg).catch(() => {});
++      }
++    }
++    logger.warn(`[RBAC] DENY (bot) uid=${ctx?.uid || ctx?.from?.id} perm="${perm}"`);
++  }
++  return allowed;
++}
++
++module.exports = {
++  ALL_PERMS,
++  VALID_PERMS,
++  checkPermission, // (uid, perm) → Promise<boolean> — للاستخدام العام خارج Express/Telegraf
++  checkPerm,       // (ctx, perm) → Promise<boolean> — لـ Telegraf ctx
++  requirePerm,     // Express middleware factory
++  requireOwner,    // Express middleware — owner only
++  botRequirePerm,  // Telegraf helper مع رد رفض تلقائي
++};
+diff --git a/routes/api.js b/routes/api.js
+index 880c425..dd8f902 100644
+--- a/routes/api.js
++++ b/routes/api.js
+@@ -55,6 +55,9 @@ const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch
+ const router = express.Router();
+ const { verifyWebApp } = require('../utils/webapp_auth');
+ const { rateLimit } = require('../utils/apiRateLimit');
++// ✅ RBAC مركزي — نفس نظام الصلاحيات الموجود في database/admins.js (ALL_PERMS/hasPerm)
++// كل admin route أدناه يجب أن يستخدم requirePerm('<perm>') أو requireOwner() بدل الفحص الثنائي القديم.
++const { requirePerm, requireOwner } = require('../middlewares/rbac');
+ 
+ // ── Global rate limit: 60 req/min per user ──
+ router.use(rateLimit(60, 60000));
+@@ -237,6 +240,8 @@ router.post('/rate/:id', auth, async (req, res) => {
+   } catch(e) { res.status(500).json({ error: e.message }); }
+ });
+ 
++// ℹ️ إعلامي فقط (لا يكشف بيانات حساسة) — يبقى فحص "أدمن بشكل عام" كافياً هنا،
++// لأن الغرض منه هو إخبار الواجهة الأمامية بحالة/صلاحيات المستخدم نفسه فقط.
+ router.get('/admin/check', auth, async (req, res) => {
+   const uid = parseInt(req.tgUser.id);
+   if (!await _checkAdmin(uid)) return res.status(403).json({ error: 'forbidden' });
+@@ -245,9 +250,8 @@ router.get('/admin/check', auth, async (req, res) => {
+   res.json({ ok: true, isOwner, perms: adm?.permissions || (isOwner ? 'full' : '') });
+ });
+ 
+-router.get('/admin/stats', auth, async (req, res) => {
++router.get('/admin/stats', auth, requirePerm('view_users'), async (req, res) => {
+   const uid = parseInt(req.tgUser.id);
+-  if (!await _checkAdmin(uid)) return res.status(403).json({ error: 'forbidden' });
+   const isOwner = _isOwnerUid(uid);
+   try {
+     const _statsCk = 'admin_stats';
+@@ -273,9 +277,8 @@ router.get('/admin/stats', auth, async (req, res) => {
+   } catch(e) { res.status(500).json({ error: e.message }); }
+ });
+ 
+-router.get('/admin/users', auth, async (req, res) => {
++router.get('/admin/users', auth, requirePerm('view_users'), async (req, res) => {
+   const uid = parseInt(req.tgUser.id);
+-  if (!await _checkAdmin(uid)) return res.status(403).json({ error: 'forbidden' });
+   const isOwner = _isOwnerUid(uid);
+   const q = req.query.q || '';
+   const page = parseInt(req.query.page || '0');
+@@ -295,48 +298,36 @@ router.get('/admin/users', auth, async (req, res) => {
+   res.json(rows);
+ });
+ 
+-router.post('/admin/ban/:id', auth, async (req, res) => {
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  const uid = parseInt(req.tgUser.id);
+-  const isOwner = uid === OWNER_ID;
+-  if (!isOwner) return res.status(403).json({ error: 'owner only' });
++// ✅ RBAC: كانت owner-only بدون سبب رغم وجود صلاحية 'ban_users' مخصصة لهذا الإجراء
++// بالضبط ضمن ALL_PERMS — أصبحت الآن مربوطة بالصلاحية الصحيحة (Owner يبقى مسموحاً دائماً تلقائياً).
++router.post('/admin/ban/:id', auth, requirePerm('ban_users'), async (req, res) => {
+   const { ban } = req.body;
+   await run('UPDATE users SET is_banned=$1 WHERE id=$2', [ban ? 1 : 0, parseInt(req.params.id)]);
+   res.json({ ok: true });
+ });
+ 
+-router.get('/admin/files', auth, async (req, res) => {
+-  const uid = parseInt(req.tgUser.id);
+-  if (!await _checkAdmin(uid)) return res.status(403).json({ error: 'forbidden' });
+-  const isOwner = _isOwnerUid(uid);
++router.get('/admin/files', auth, requirePerm('add_content'), async (req, res) => {
+   const rows = await all(`SELECT f.*,c.name as cat_name FROM files f LEFT JOIN categories c ON c.id=f.category_id WHERE f.is_deleted=0 ORDER BY f.uploaded_at DESC LIMIT 50`);
+   res.json(rows);
+ });
+ 
+-router.post('/admin/delfile/:id', auth, async (req, res) => {
+-  const uid = parseInt(req.tgUser.id);
+-  if (!await _checkAdmin(uid)) return res.status(403).json({ error: 'forbidden' });
+-  const isOwner = _isOwnerUid(uid);
++router.post('/admin/delfile/:id', auth, requirePerm('delete'), async (req, res) => {
+   await run('UPDATE files SET is_deleted=1 WHERE id=$1', [parseInt(req.params.id)]);
+   res.json({ ok: true });
+ });
+ 
+ // ═══ ADMIN ADVANCED ROUTES ═══
+ 
+-router.get('/admin/groups', auth, async (req, res) => {
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  const uid = parseInt(req.tgUser.id);
+-  if (!await _checkAdmin(uid) && uid !== OWNER_ID) return res.status(403).json({ error: 'forbidden' });
++router.get('/admin/groups', auth, requirePerm('manage_groups'), async (req, res) => {
+   try {
+     const rows = await all(`SELECT gc.*, sp.name as sp_name, COUNT(gm.user_id) as members FROM group_chats gc LEFT JOIN specialties sp ON gc.specialty_id=sp.id LEFT JOIN group_members gm ON gc.chat_id=gm.chat_id GROUP BY gc.chat_id, gc.title, gc.specialty_id, gc.notify_new_files, gc.joined_at, sp.name ORDER BY members DESC`);
+     res.json(rows);
+   } catch(e) { res.json([]); }
+ });
+ 
+-router.post('/admin/broadcast', auth, async (req, res) => {
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  const uid = parseInt(req.tgUser.id);
+-  if (uid !== OWNER_ID) return res.status(403).json({ error: 'owner only' });
++// ✅ RBAC: كانت owner-only رغم وجود صلاحية 'broadcast' مخصصة لهذا بالضبط ضمن ALL_PERMS —
++// أصبحت مربوطة بالصلاحية الصحيحة (Owner يبقى مسموحاً دائماً تلقائياً عبر requirePerm).
++router.post('/admin/broadcast', auth, requirePerm('broadcast'), async (req, res) => {
+   const _sb308 = sanitizeBody(req.body, { text: 2000 }); const { text, target, specialtyId } = _sb308;
+   if (!text) return res.status(400).json({ error: 'no text' });
+   try {
+@@ -362,44 +353,31 @@ router.post('/admin/broadcast', auth, async (req, res) => {
+   } catch(e) { res.status(500).json({ error: e.message }); }
+ });
+ 
+-router.get('/admin/specialties', auth, async (req, res) => {
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  const uid = parseInt(req.tgUser.id);
+-  if (!await _checkAdmin(uid) && uid !== OWNER_ID) return res.status(403).json({ error: 'forbidden' });
++router.get('/admin/specialties', auth, requirePerm('add_content'), async (req, res) => {
+   const rows = await all('SELECT * FROM specialties WHERE is_deleted=0 ORDER BY id');
+   res.json(rows);
+ });
+ 
+-router.get('/admin/reports', auth, async (req, res) => {
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  const uid = parseInt(req.tgUser.id);
+-  if (!await _checkAdmin(uid) && uid !== OWNER_ID) return res.status(403).json({ error: 'forbidden' });
++router.get('/admin/reports', auth, requirePerm('add_content'), async (req, res) => {
+   try {
+     const rows = await all(`SELECT r.*, f.title as file_title, u.first_name FROM reports r LEFT JOIN files f ON f.id=r.file_id LEFT JOIN users u ON u.id=r.user_id WHERE r.status='pending' ORDER BY r.created_at DESC LIMIT 30`);
+     res.json(rows);
+   } catch(e) { res.json([]); }
+ });
+ 
+-router.post('/admin/report/:id/resolve', auth, async (req, res) => {
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  const uid = parseInt(req.tgUser.id);
+-  if (!await _checkAdmin(uid) && uid !== OWNER_ID) return res.status(403).json({ error: 'forbidden' });
++router.post('/admin/report/:id/resolve', auth, requirePerm('add_content'), async (req, res) => {
+   await run('UPDATE reports SET status=$1 WHERE id=$2', [req.body.status || 'resolved', parseInt(req.params.id)]);
+   res.json({ ok: true });
+ });
+ 
+-router.get('/admin/admins', auth, async (req, res) => {
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  const uid = parseInt(req.tgUser.id);
+-  if (uid !== OWNER_ID) return res.status(403).json({ error: 'owner only' });
++// 🔒 حساس جداً: إدارة قائمة الأدمنية نفسها تبقى Owner-only دائماً — لا صلاحية أدمن تمنح هذا،
++// لمنع privilege-escalation (أدمن يضيف/يحذف أدمنية آخرين).
++router.get('/admin/admins', auth, requireOwner(), async (req, res) => {
+   const rows = await all(`SELECT a.*, u.first_name, u.username FROM admins a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.added_at DESC`);
+   res.json(rows);
+ });
+ 
+-router.post('/admin/removeadmin/:id', auth, async (req, res) => {
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  const uid = parseInt(req.tgUser.id);
+-  if (uid !== OWNER_ID) return res.status(403).json({ error: 'owner only' });
++router.post('/admin/removeadmin/:id', auth, requireOwner(), async (req, res) => {
+   await run('DELETE FROM admins WHERE user_id=$1', [parseInt(req.params.id)]);
+   res.json({ ok: true });
+ });
+@@ -421,13 +399,7 @@ router.post('/admin/upload-media', (req, res, next) => {
+   if (!user) return res.status(401).json({ error: 'unauthorized' });
+   req.tgUser = user;
+   next();
+-}, upload.single('file'), async (req, res) => {
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  const uid = parseInt(req.tgUser.id);
+-
+-  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1', [uid]).catch(() => null);
+-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+-
++}, requirePerm('add_content'), upload.single('file'), async (req, res) => {
+   try {
+     const file = req.file;
+     if (!file) return res.status(400).json({ error: 'no file' });
+@@ -473,12 +445,7 @@ router.post('/admin/upload-media', (req, res, next) => {
+ 
+ // ─── إصلاح بروفايل المستخدم (للأونر/أدمن) ──────────────────────
+ // احذف أو استبدل الـ route القديم /admin/user/:id/profile بهذا:
+-router.get('/admin/user/:id/profile', auth, async (req, res) => {
+-  const uid = parseInt(req.tgUser.id);
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1', [uid]).catch(() => null);
+-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+-
++router.get('/admin/user/:id/profile', auth, requirePerm('view_users'), async (req, res) => {
+   try {
+     const targetId = req.params.id;
+ 
+@@ -729,18 +696,26 @@ router.post('/comment/:id/like', auth, async (req, res) => {
+ });
+ 
+ // ─── إضافة مشرف جديد ──────────────────────────────────────────────
+-router.post('/admin/addadmin', auth, async (req, res) => {
++// 🔒 Owner-only (إدارة الأدمنية أنفسهم لا تُمنح لأي صلاحية أدمن — يمنع privilege escalation).
++// ✅ RBAC fix: لم يعد يمنح 'full' تلقائياً عند عدم تحديد صلاحيات. يُعاد استخدام
++// database/admins.js:add() الموجود مسبقاً (بدل SQL خام مباشر هنا) لأنه يطبّق
++// sanitizePerms() ويرفض أي قيمة غير معروفة ضمن ALL_PERMS (fail-closed).
++router.post('/admin/addadmin', auth, requireOwner(), async (req, res) => {
+   const uid = parseInt(req.tgUser.id);
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  if (uid !== OWNER_ID) return res.status(403).json({ error: 'owner only' });
+   const { userId, permissions } = req.body;
+-  if (!userId) return res.status(400).json({ error: 'userId required' });
++  const targetId = parseInt(userId);
++  if (!userId || !Number.isFinite(targetId)) return res.status(400).json({ error: 'userId required' });
++  if (!permissions || !String(permissions).trim()) {
++    return res.status(400).json({ error: 'permissions required — يجب تحديد الصلاحيات صراحة، لا يوجد افتراضي "full"' });
++  }
+   try {
+-    await run(
+-      'INSERT INTO admins(user_id,added_by,permissions) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET permissions=$3',
+-      [parseInt(userId), uid, permissions || 'full']
+-    );
+-    res.json({ ok: true });
++    const adminsDb = require('../database/admins');
++    const clean = adminsDb.sanitizePerms(permissions);
++    if (!clean) {
++      return res.status(400).json({ error: 'invalid permissions — تحقق من القيم المسموحة', valid: Object.keys(adminsDb.ALL_PERMS) });
++    }
++    await adminsDb.add(targetId, uid, clean);
++    res.json({ ok: true, permissions: clean });
+   } catch(e) { res.status(500).json({ error: e.message }); }
+ });
+ 
+@@ -769,11 +744,8 @@ router.get('/channels', auth, async (req, res) => {
+ });
+ 
+ // ─── إنشاء إعلان ─────────────────────────────────────────────────
+-router.post('/admin/ads', auth, async (req, res) => {
++router.post('/admin/ads', auth, requirePerm('add_content'), async (req, res) => {
+   const uid = parseInt(req.tgUser.id);
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
+-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+   const _sb753 = sanitizeBody(req.body, { title: 200, body: 2000, icon: 200, link: 500, image_url: 500, video_url: 500 }); const { title, body, icon, link, specialty_id, is_pinned, image_url, video_url } = _sb753;
+   if (!title) return res.status(400).json({ error: 'title required' });
+   try {
+@@ -796,21 +768,14 @@ router.post('/admin/ads', auth, async (req, res) => {
+   }
+ });
+ 
+-router.post('/admin/ads/:id/delete', auth, async (req, res) => {
+-  const uid = parseInt(req.tgUser.id);
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
+-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
++router.post('/admin/ads/:id/delete', auth, requirePerm('add_content'), async (req, res) => {
+   try { await run('UPDATE ads SET is_deleted=1 WHERE id=$1',[parseInt(req.params.id)]); res.json({ ok:true }); }
+   catch(e) { res.status(500).json({ error: e.message }); }
+ });
+ 
+ // ─── إنشاء قناة ──────────────────────────────────────────────────
+-router.post('/admin/channels', auth, async (req, res) => {
++router.post('/admin/channels', auth, requirePerm('add_content'), async (req, res) => {
+   const uid = parseInt(req.tgUser.id);
+-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+-  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
+-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+   const { name, description, link, icon, members_count } = req.body;
+   if (!name) return res.status(400).json({ error: 'name required' });
+   try {
+diff --git a/test/rbac.test.js b/test/rbac.test.js
+new file mode 100644
+index 0000000..10b909d
+--- /dev/null
++++ b/test/rbac.test.js
+@@ -0,0 +1,245 @@
++'use strict';
++/**
++ * ════════════════════════════════════════════════════════════
++ *  🧪 test/rbac.test.js — RBAC scenario tests
++ * ════════════════════════════════════════════════════════════
++ *
++ * يشغّل الكود الحقيقي المشحون فعلاً في:
++ *   - database/admins.js   (hasPerm, sanitizePerms, add, updatePerms, getPerms, isAdmin)
++ *   - middlewares/rbac.js  (checkPermission, checkPerm, requirePerm, requireOwner, botRequirePerm)
++ *
++ * وليس إعادة كتابة للمنطق. الاستبدال الوحيد هو طبقة قاعدة البيانات (database/db.js)
++ * و middlewares/auth.js — يُستبدلان بـ stub بسيط في الذاكرة، لأن هذه البيئة الحالية
++ * لا تملك pg/express مثبّتة (لا يوجد اتصال شبكة لتشغيل npm install).
++ *
++ * التشغيل: node test/rbac.test.js
++ * على جهازك (بعد npm install) يمكنك أيضاً حذف هذا الـ stub لاحقاً وتشغيله ضد DB حقيقية
++ * تجريبية إذا رغبت باختبار تكاملي كامل — لكن هذا الملف كافٍ للتحقق من منطق RBAC نفسه.
++ */
++
++const path = require('path');
++const Module = require('module');
++
++process.env.OWNER_ID = '111'; // 👑 مالك وهمي للاختبار
++
++// ─── In-memory fake admins table ─────────────────────────────
++const admins = {
++  // 222: أدمن بصلاحية واحدة فقط
++  222: { permissions: 'upload' },
++  // 333: غير موجود إطلاقاً بجدول admins (يُختبر لاحقاً كمستخدم عادي)
++  // 444: أدمن أُضيف لكن صلاحياته فارغة (يُختبر fail-closed)
++  444: { permissions: '' },
++};
++
++function fakeGet(sql, params) {
++  const uid = params && params[0];
++  if (sql.includes('SELECT permissions FROM admins')) {
++    const row = admins[uid];
++    return Promise.resolve(row ? { permissions: row.permissions } : undefined);
++  }
++  if (sql.includes('SELECT 1 FROM admins')) {
++    return Promise.resolve(admins[uid] ? { 1: 1 } : undefined);
++  }
++  if (sql.includes('SELECT specialty_id FROM admins')) {
++    return Promise.resolve(admins[uid] ? { specialty_id: admins[uid].specialty_id || 0 } : undefined);
++  }
++  return Promise.resolve(undefined);
++}
++
++function fakeAll() { return Promise.resolve([]); }
++
++function fakeRun(sql, params) {
++  if (sql.includes('INSERT INTO admins')) {
++    const [uid, , perms] = params;
++    admins[uid] = { permissions: perms };
++  } else if (sql.includes('UPDATE admins SET permissions')) {
++    const [perms, uid] = params;
++    admins[uid] = admins[uid] || {};
++    admins[uid].permissions = perms;
++  } else if (sql.includes('DELETE FROM admins')) {
++    delete admins[params[0]];
++  }
++  return Promise.resolve({ rowCount: 1 });
++}
++
++// ─── حقن الـ stubs في require.cache قبل تحميل الكود الحقيقي ───
++function injectStub(relPath, exportsObj) {
++  const resolved = require.resolve(relPath);
++  const m = new Module(resolved, null);
++  m.exports = exportsObj;
++  m.loaded = true;
++  require.cache[resolved] = m;
++}
++
++const root = path.join(__dirname, '..');
++injectStub(path.join(root, 'database/db.js'), { get: fakeGet, all: fakeAll, run: fakeRun });
++injectStub(path.join(root, 'middlewares/auth.js'), {
++  isOwner: uid => parseInt(uid) === parseInt(process.env.OWNER_ID), // مطابق حرفياً لمنطق auth.js الحقيقي
++});
++
++// ─── الآن حمّل الكود الحقيقي ────────────────────────────────
++const adminsDb = require('../database/admins');
++const rbac = require('../middlewares/rbac');
++
++// ─── Mini test runner ───────────────────────────────────────
++let pass = 0, fail = 0;
++async function t(name, fn) {
++  try {
++    await fn();
++    pass++;
++    console.log('  ✅ ' + name);
++  } catch (e) {
++    fail++;
++    console.log('  ❌ ' + name + '\n     → ' + e.message);
++  }
++}
++function assert(cond, msg) { if (!cond) throw new Error(msg || 'assertion failed'); }
++function assertEq(a, b, msg) { if (a !== b) throw new Error((msg || 'not equal') + ` (got ${JSON.stringify(a)}, expected ${JSON.stringify(b)})`); }
++
++// ─── سيناريوهات فارغة ────────────────────────────────────────
++function fakeExpressReqRes(uid) {
++  const state = { statusCode: null, body: null, called: false };
++  const req = { tgUser: uid != null ? { id: uid } : undefined };
++  const res = {
++    status(c) { state.statusCode = c; return this; },
++    json(b) { state.body = b; return this; },
++  };
++  const next = () => { state.called = true; };
++  return { req, res, next, state };
++}
++
++function fakeBotCtx(uid, isOwner, adminPerms) {
++  let repliedWith = null, cbAnswered = null;
++  return {
++    uid, from: { id: uid }, isOwner,
++    adminPerms,
++    reply: async (msg) => { repliedWith = msg; },
++    answerCbQuery: async (msg) => { cbAnswered = msg; },
++    get lastReply() { return repliedWith; },
++    get lastCbAnswer() { return cbAnswered; },
++  };
++}
++
++(async () => {
++  console.log('\n🧪 RBAC scenario tests\n───────────────────────');
++
++  console.log('\n[1] Owner — يجب أن يملك كل الصلاحيات دائماً:');
++  await t('Owner(111) لديه view_users', async () => assertEq(await rbac.checkPermission(111, 'view_users'), true));
++  await t('Owner(111) لديه ban_users', async () => assertEq(await rbac.checkPermission(111, 'ban_users'), true));
++  await t('Owner(111) لديه broadcast رغم عدم وجوده أصلاً بجدول admins', async () => assertEq(await rbac.checkPermission(111, 'broadcast'), true));
++
++  console.log('\n[2] Admin بصلاحية واحدة (uid=222, perms="upload"):');
++  await t('222 يملك upload', async () => assertEq(await rbac.checkPermission(222, 'upload'), true));
++  await t('222 لا يملك broadcast', async () => assertEq(await rbac.checkPermission(222, 'broadcast'), false));
++  await t('222 لا يملك delete', async () => assertEq(await rbac.checkPermission(222, 'delete'), false));
++  await t('222 لا يملك ban_users', async () => assertEq(await rbac.checkPermission(222, 'ban_users'), false));
++
++  console.log('\n[3] Admin بدون صلاحية أصلاً (uid=444, perms=""):');
++  await t('444 لا يملك أي شيء (fail-closed على قيمة فارغة)', async () => assertEq(await rbac.checkPermission(444, 'upload'), false));
++
++  console.log('\n[4] مستخدم عادي غير موجود بجدول admins (uid=333):');
++  await t('333 لا يملك upload', async () => assertEq(await rbac.checkPermission(333, 'upload'), false));
++  await t('333 لا يملك أي صلاحية حتى المنخفضة الخطورة', async () => assertEq(await rbac.checkPermission(333, 'view_users'), false));
++
++  console.log('\n[5] محاولة وصول مباشر لـ API بدون صلاحية (Express middleware requirePerm):');
++  await t('222 (upload فقط) يُرفض من requirePerm("ban_users") بـ 403', async () => {
++    const { req, res, next, state } = fakeExpressReqRes(222);
++    await rbac.requirePerm('ban_users')(req, res, next);
++    assertEq(state.statusCode, 403);
++    assertEq(state.called, false);
++    assert(state.body && state.body.error === 'forbidden', 'expected forbidden error body');
++  });
++  await t('222 (upload فقط) يُسمح له من requirePerm("upload")', async () => {
++    const { req, res, next, state } = fakeExpressReqRes(222);
++    await rbac.requirePerm('upload')(req, res, next);
++    assertEq(state.called, true);
++    assertEq(state.statusCode, null);
++  });
++  await t('333 (مستخدم عادي) يُرفض من requirePerm حتى لأخف صلاحية', async () => {
++    const { req, res, next, state } = fakeExpressReqRes(333);
++    await rbac.requirePerm('view_users')(req, res, next);
++    assertEq(state.statusCode, 403);
++  });
++  await t('111 (Owner) يُسمح له دائماً من requireOwner()', async () => {
++    const { req, res, next, state } = fakeExpressReqRes(111);
++    await rbac.requireOwner()(req, res, next);
++    assertEq(state.called, true);
++    assertEq(state.statusCode, null);
++  });
++  await t('222 (أدمن غير مالك) يُرفض من requireOwner()', async () => {
++    const { req, res, next, state } = fakeExpressReqRes(222);
++    await rbac.requireOwner()(req, res, next);
++    assertEq(state.statusCode, 403);
++    assertEq(state.called, false);
++  });
++  await t('طلب بدون tgUser إطلاقاً (غير مُصادَق) يُرفض بـ 401 من requirePerm', async () => {
++    const { req, res, next, state } = fakeExpressReqRes(null);
++    await rbac.requirePerm('upload')(req, res, next);
++    assertEq(state.statusCode, 401);
++    assertEq(state.called, false);
++  });
++
++  console.log('\n[6] fail-closed ضد صلاحيات غير معرّفة (typo/اختراع):');
++  await t('صلاحية غير موجودة أصلاً في ALL_PERMS تُرفض حتى للأدمن', async () => {
++    assertEq(await rbac.checkPermission(222, 'super_admin_mode'), false);
++  });
++  await t('نفس الشيء حتى لو "خزّنّا" هذه القيمة الوهمية في عمود permissions', async () => {
++    admins[222].permissions = 'upload,super_admin_mode';
++    assertEq(await rbac.checkPermission(222, 'super_admin_mode'), false); // fail-closed: القيمة غير معروفة أصلاً
++    admins[222].permissions = 'upload'; // استرجاع الحالة
++  });
++
++  console.log('\n[7] sanitizePerms() — لا صلاحيات وهمية تُحفظ أبداً:');
++  await t('يبقي القيم الصحيحة فقط ويحذف الوهمية', () => {
++    assertEq(adminsDb.sanitizePerms('full, made_up_perm ,upload,,upload'), 'full,upload');
++  });
++  await t('قيمة فارغة تماماً ترجع فارغة (وليس "full")', () => {
++    assertEq(adminsDb.sanitizePerms(''), '');
++  });
++  await t('قيمة كلها وهمية ترجع فارغة', () => {
++    assertEq(adminsDb.sanitizePerms('xx,yy,zz'), '');
++  });
++
++  console.log('\n[8] add() — لا "full" تلقائي أبداً عند عدم التحديد الصريح:');
++  await t('add(uid, by) بدون perms يعطي الافتراضي المحدود، ليس full', async () => {
++    await adminsDb.add(999, 111); // بدون تمرير perms إطلاقاً
++    assertEq(admins[999].permissions, 'upload,add_content');
++    assert(!admins[999].permissions.includes('full'), 'يجب ألا تحتوي full تلقائياً');
++  });
++  await t('add(uid, by, "evil,made_up") تُنظَّف لصلاحيات آمنة بدل قبول قيم وهمية', async () => {
++    await adminsDb.add(998, 111, 'evil,made_up');
++    assertEq(admins[998].permissions, 'upload,add_content'); // fallback الآمن لأن كل القيم كانت وهمية
++  });
++  await t('add(uid, by, "delete,manage_groups") تحفظ فقط ما طُلب صراحة وهو صالح', async () => {
++    await adminsDb.add(997, 111, 'delete,manage_groups');
++    assertEq(admins[997].permissions, 'delete,manage_groups');
++  });
++
++  console.log('\n[9] Telegram bot ctx (botRequirePerm) — نفس الاختبارات لكن على واجهة البوت:');
++  await t('Owner ctx: مسموح دائماً بدون رسالة رفض', async () => {
++    const ctx = fakeBotCtx(111, true, ['full']); // owner-ish ctx
++    const ok = await rbac.botRequirePerm(ctx, 'broadcast');
++    assertEq(ok, true);
++    assertEq(ctx.lastReply, null);
++  });
++  await t('Admin ctx بصلاحية واحدة محمّلة مسبقاً (fast path ctx.adminPerms): مسموح لصلاحيته فقط', async () => {
++    const ctx = fakeBotCtx(222, false, ['upload']);
++    assertEq(await rbac.botRequirePerm(ctx, 'upload'), true);
++  });
++  await t('Admin ctx بصلاحية واحدة: يُرفض لصلاحية أخرى + يرسل رسالة رفض', async () => {
++    const ctx = fakeBotCtx(222, false, ['upload']);
++    const ok = await rbac.botRequirePerm(ctx, 'delete');
++    assertEq(ok, false);
++    assert(ctx.lastReply && ctx.lastReply.includes('صلاحية'), 'يجب إرسال رسالة رفض للمستخدم');
++  });
++  await t('مستخدم عادي (isAdmin=false, adminPerms=[]) يُرفض من أي صلاحية', async () => {
++    const ctx = fakeBotCtx(333, false, []);
++    assertEq(await rbac.botRequirePerm(ctx, 'view_users'), false);
++  });
++
++  console.log('\n───────────────────────');
++  console.log(`النتيجة: ${pass} ناجح، ${fail} فاشل، من أصل ${pass + fail}`);
++  if (fail > 0) { console.log('🔴 توجد اختبارات فاشلة — راجع الأعلى.'); process.exit(1); }
++  console.log('🟢 كل الاختبارات ناجحة.');
++  process.exit(0);
++})();
