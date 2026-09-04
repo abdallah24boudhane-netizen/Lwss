@@ -8,18 +8,39 @@ const logger = require('../utils/logger');
 const DEEZER_SEARCH = q =>
   `https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=8`;
 
-function _resolveYtdlpPath() {
-  if (process.env.YTDLP_PATH) return process.env.YTDLP_PATH;
-  const bundled = path.join(__dirname, '..', '.bin', 'yt-dlp');
-  return fs.existsSync(bundled) ? bundled : 'yt-dlp';
-}
-const YTDLP_PATH  = _resolveYtdlpPath();
+let YTDLP_PATH   = process.env.YTDLP_PATH || 'yt-dlp';
 const FFMPEG_PATH = process.env.FFMPEG_PATH || 'ffmpeg';
 const COOKIES_FILE = process.env.YTDLP_COOKIES_FILE || '';
 const TMP_DIR    = os.tmpdir();
 const MAX_SIZE   = 45 * 1024 * 1024;
 const DL_TIMEOUT = 90_000;
 const MAX_CANDIDATES = 2;
+
+const FRESH_YTDLP_PATH = path.join(TMP_DIR, 'lwss-yt-dlp-fresh');
+let _freshYtdlpAttempted = false;
+
+async function ensureFreshYtdlp() {
+  if (process.env.YTDLP_PATH) return;
+  if (_freshYtdlpAttempted) return;
+  _freshYtdlpAttempted = true;
+  try {
+    if (!fs.existsSync(FRESH_YTDLP_PATH)) {
+      const res = await fetch(
+        'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp',
+        { redirect: 'follow' }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const buf = Buffer.from(await res.arrayBuffer());
+      fs.writeFileSync(FRESH_YTDLP_PATH, buf);
+    }
+    fs.chmodSync(FRESH_YTDLP_PATH, 0o755);
+    YTDLP_PATH = FRESH_YTDLP_PATH;
+    logger.info('[Music] using freshly-fetched yt-dlp binary:', FRESH_YTDLP_PATH);
+  } catch (e) {
+    logger.error('[Music] could not fetch fresh yt-dlp binary, falling back to system yt-dlp:', e.message);
+  }
+}
+exports.ensureFreshYtdlp = ensureFreshYtdlp;
 
 const fmtDur = s => s ? `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}` : '';
 const escMd  = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
@@ -40,6 +61,7 @@ function _probe(bin, versionFlag) {
 
 async function checkDependencies(force = false) {
   if (_depsCache && !force) return _depsCache;
+  await ensureFreshYtdlp();
   const [ytOk, ffOk] = await Promise.all([
     _probe(YTDLP_PATH, '--version'),
     _probe(FFMPEG_PATH, '-version'),
@@ -61,8 +83,7 @@ exports.checkDependencies = checkDependencies;
 function ytSearch(query) {
   return new Promise((resolve, reject) => {
     execFile(YTDLP_PATH,
-      [`ytsearch5:${query}`, '--dump-json', '--flat-playlist', '--no-warnings', '--quiet',
-       '--extractor-args', 'youtube:player_client=android,web'],
+      [`ytsearch5:${query}`, '--dump-json', '--flat-playlist', '--no-warnings', '--quiet'],
       { timeout: 15000 },
       (err, stdout) => {
         if (err) return reject(err);
@@ -116,8 +137,6 @@ function cleanupTmpPrefix(tmpBase) {
 }
 
 function encodeTitle(s, maxRaw) {
-  // نقصّ النص الخام قبل التشفير فقط — القص بعد التشفير قد يقطع رمزاً مشفّراً (%XX) في المنتصف
-  // ويسبب 'URI malformed' لاحقاً عند فك التشفير.
   return encodeURIComponent((s||'').substring(0, maxRaw || 12));
 }
 
