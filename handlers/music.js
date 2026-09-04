@@ -141,16 +141,7 @@ function encodeTitle(s, maxRaw) {
 }
 
 function buildResultsMsg(tracks, query) {
-  let text = `🎵 *نتائج البحث عن:* _${escMd(query)}_\n━━━━━━━━━━━━━━━━━━\n\n`;
-  tracks.forEach((t, i) => {
-    const dur = fmtDur(t.duration);
-    text += `${i+1}. 🎵 *${escMd(t.title)}*\n`;
-    text += `   👤 ${escMd(t.artist?.name || '?')}`;
-    if (dur) text += `  ⏱ ${dur}`;
-    text += '\n';
-  });
-  text += '\n_اضغط على أغنية لتحميلها كاملاً_ 🎶';
-  return text;
+  return `🎵 نتائج البحث عن: *${escMd(query)}*`;
 }
 
 function buildResultsKb(tracks) {
@@ -301,17 +292,9 @@ exports.handleCallback = async (ctx) => {
         cover = deezerTrack.album?.cover_medium;
       } catch(_) {}
 
-      const caption =
-        `🎵 *${escMd(title)}*\n` +
-        (artist ? `👤 *${escMd(artist)}*\n` : '') +
-        (ydur   ? `⏱ ${fmtDur(ydur)}\n`    : '') +
-        `\n🤖 @${ctx.botInfo?.username || 'TalineBot'}`;
-
       await ctx.replyWithAudio(
         { source: outFile },
         {
-          caption,
-          parse_mode: 'Markdown',
           title,
           performer: artist,
           thumb: cover ? { url: cover } : undefined,
