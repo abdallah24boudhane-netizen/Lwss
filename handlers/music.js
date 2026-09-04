@@ -56,7 +56,8 @@ exports.checkDependencies = checkDependencies;
 function ytSearch(query) {
   return new Promise((resolve, reject) => {
     execFile(YTDLP_PATH,
-      [`ytsearch5:${query}`, '--dump-json', '--flat-playlist', '--no-warnings', '--quiet'],
+      [`ytsearch5:${query}`, '--dump-json', '--flat-playlist', '--no-warnings', '--quiet',
+       '--extractor-args', 'youtube:player_client=android,web'],
       { timeout: 15000 },
       (err, stdout) => {
         if (err) return reject(err);
