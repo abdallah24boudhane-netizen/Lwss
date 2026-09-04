@@ -8,7 +8,12 @@ const logger = require('../utils/logger');
 const DEEZER_SEARCH = q =>
   `https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=8`;
 
-const YTDLP_PATH  = process.env.YTDLP_PATH  || 'yt-dlp';
+function _resolveYtdlpPath() {
+  if (process.env.YTDLP_PATH) return process.env.YTDLP_PATH;
+  const bundled = path.join(__dirname, '..', '.bin', 'yt-dlp');
+  return fs.existsSync(bundled) ? bundled : 'yt-dlp';
+}
+const YTDLP_PATH  = _resolveYtdlpPath();
 const FFMPEG_PATH = process.env.FFMPEG_PATH || 'ffmpeg';
 const COOKIES_FILE = process.env.YTDLP_COOKIES_FILE || '';
 const TMP_DIR    = os.tmpdir();
@@ -48,7 +53,7 @@ async function checkDependencies(force = false) {
     logger.error('[Music] DEPENDENCY MISSING: ffmpeg not found/executable (path:', FFMPEG_PATH,
       '). Audio extraction will fail for every song until this is installed.');
   }
-  if (ytOk && ffOk) logger.info('[Music] dependency check OK: yt-dlp and ffmpeg are available.');
+  if (ytOk && ffOk) logger.info('[Music] dependency check OK: yt-dlp and ffmpeg are available. (yt-dlp path: ' + YTDLP_PATH + ')');
   return _depsCache;
 }
 exports.checkDependencies = checkDependencies;

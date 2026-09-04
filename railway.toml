@@ -3,10 +3,13 @@ builder = "nixpacks"
 
 [build.nixpacksPlan.phases.setup]
 # يجب أن تبقى هذه القائمة مطابقة لـ nixpacks.toml.
-nixPkgs = ["nodejs_20", "yt-dlp", "ffmpeg"]
+nixPkgs = ["nodejs_20", "yt-dlp", "ffmpeg", "curl"]
 
 [build.nixpacksPlan.phases.build]
-cmds = ["npm ci --omit=dev"]
+cmds = [
+  "npm ci --omit=dev",
+  "mkdir -p .bin && (curl -fsSL -o .bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp && chmod +x .bin/yt-dlp || echo 'yt-dlp fresh-binary fetch failed, using nix-provided yt-dlp')"
+]
 
 [deploy]
 startCommand = "node_modules/.bin/pm2-runtime ecosystem.config.js"
