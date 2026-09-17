@@ -5,7 +5,7 @@
 
 module.exports = {
   // ── حدود اللاعبين ──
-  MIN_PLAYERS: 2,
+  MIN_PLAYERS: 6,
   MAX_PLAYERS: 15,
 
   // ── مؤقتات (بالمللي ثانية) ──

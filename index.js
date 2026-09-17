@@ -396,6 +396,17 @@ const gameAndBankMiddleware = async (ctx, next) => {
 };
 
 // ── تسجيل middleware بالترتيب الصحيح ──
+// TIMING: measures callback_query round-trip time, logs to console.
+bot.use(async (ctx, next) => {
+  if (ctx.callbackQuery) {
+    const _t0 = Date.now();
+    await next();
+    const _ms = Date.now() - _t0;
+    console.log('[TIMING] callback "' + ctx.callbackQuery.data + '" -> ' + _ms + 'ms');
+  } else {
+    await next();
+  }
+});
 bot.use(rateLimit);
 
 // 🏗 إنشاء جداول member cards عند البدء
