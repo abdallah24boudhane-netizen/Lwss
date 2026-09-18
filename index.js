@@ -82,6 +82,7 @@ app.disable('x-powered-by');
 app.use(helmet({ contentSecurityPolicy: { directives: {
   defaultSrc: ["'self'"],
   scriptSrc:  ["'self'", "'unsafe-inline'", 'telegram.org', '*.telegram.org'],
+  scriptSrcAttr: ["'unsafe-inline'"], // ✅ يسمح بأزرار onclick="..." (كانت محظورة بصمت بدون هذا السطر)
   styleSrc:   ["'self'", "'unsafe-inline'"],
   imgSrc:     ["'self'", 'data:', 'https:'],
   connectSrc: ["'self'", 'https://api.telegram.org'],
