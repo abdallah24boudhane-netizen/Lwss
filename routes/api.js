@@ -448,6 +448,7 @@ router.post('/admin/upload-media', (req, res, next) => {
 router.get('/admin/user/:id/profile', auth, requirePerm('view_users'), async (req, res) => {
   try {
     const targetId = req.params.id;
+    const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
 
     // ── جلب المستخدم بدون specialty join ──
     const user = await get('SELECT * FROM users WHERE id=$1', [parseInt(targetId)]);
