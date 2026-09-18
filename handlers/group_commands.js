@@ -922,10 +922,15 @@ function setupGroupCommands(bot) {
       if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 5000);
       return;
     }
-    const kb = results.slice(0, 8).map(f => ([{
-      text: (f.title || f.name || 'ملف').substring(0, 40),
-      callback_data: 'gsf-' + f.id + '-' + ctx.from.id
-    }]));
+    const kb = results.slice(0, 8).map(f => {
+      const label = (f.specialty_name ? f.specialty_name + ' › ' : '') +
+                    (f.sub_name ? f.sub_name + ' — ' : '') +
+                    (f.title || f.name || 'ملف');
+      return [{
+        text: label.substring(0, 64),
+        callback_data: 'gsf-' + f.id + '-' + ctx.from.id
+      }];
+    });
     kb.push([{ text: '❌ إلغاء', callback_data: 'grp_search_close' }]);
     ctx.reply(
       '🔍 *نتائج البحث عن:* ' + query + '\n' +

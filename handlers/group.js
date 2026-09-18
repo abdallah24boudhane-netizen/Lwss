@@ -35,13 +35,26 @@ async function smartSearch(rawQ,limit){
   const idsToVerify = [...allResults.keys()];
   if (idsToVerify.length) {
     const { all: _dbAll } = require('../database/db');
-    const liveIds = await _dbAll(
-      `SELECT id FROM files WHERE id = ANY($1::int[]) AND is_deleted=0`,
+    const liveRows = await _dbAll(
+      `SELECT f.id, s.name as sub_name, sp.name as specialty_name
+       FROM files f
+       JOIN categories c ON f.category_id=c.id
+       JOIN subjects s ON c.subject_id=s.id
+       JOIN semesters sm ON s.semester_id=sm.id
+       JOIN years y ON sm.year_id=y.id
+       JOIN specialties sp ON y.specialty_id=sp.id
+       WHERE f.id = ANY($1::int[]) AND f.is_deleted=0`,
       [idsToVerify]
     ).catch(() => null);
-    if (liveIds) {
-      const liveSet = new Set(liveIds.map(r => r.id));
-      for (const id of idsToVerify) if (!liveSet.has(id)) allResults.delete(id);
+    if (liveRows) {
+      const liveMap = new Map(liveRows.map(r => [r.id, r]));
+      for (const id of idsToVerify) {
+        const row = liveMap.get(id);
+        if (!row) { allResults.delete(id); continue; }
+        const f = allResults.get(id);
+        f.sub_name = row.sub_name;
+        f.specialty_name = row.specialty_name;
+      }
     }
   }
 
