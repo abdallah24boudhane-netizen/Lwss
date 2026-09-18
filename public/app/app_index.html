@@ -618,7 +618,7 @@ const NAV={
   back(){
     const pv=STACK.pop();_isBack=true;
     if(!pv||STACK.length===0){setHdr('',false);tg?.BackButton?.hide();({home:P.home,browse:P.browse,ads:P.ads,channels:P.channels,profile:P.profile,search:P.search,admin:P.admin})[pv?.tab||_tab]?.();}
-    else{const top=STACK[STACK.length-1];setHdr(top.title,true);tg?.BackButton?.show();P[pv.page]?.(pv.params);}
+    else{const top=STACK[STACK.length-1];setHdr(top.title,true);tg?.BackButton?.show();P[top.page]?.(top.params);}
   }
 };
 tg?.BackButton?.onClick(()=>NAV.back());
