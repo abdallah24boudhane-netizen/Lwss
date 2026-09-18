@@ -1431,10 +1431,12 @@ module.exports.registerCallbacks = function(bot, deps) {
         if (!file) return ctx.answerCbQuery('❌ الملف غير موجود', { show_alert: true }).catch(() => {});
         try {
           const caption = '📁 *' + (file.title || file.name || 'ملف') + '*';
-          if (file.file_id) {
-            await ctx.telegram.sendDocument(ctx.chat.id, file.file_id, { caption, parse_mode: 'Markdown' });
+          if (file.file_type === 'photo') {
+            await ctx.telegram.sendPhoto(ctx.chat.id, file.file_id, { caption, parse_mode: 'Markdown' });
+          } else if (file.file_type === 'link') {
+            await ctx.reply(caption + '\n🔗 ' + file.file_id, { parse_mode: 'Markdown' });
           } else {
-            await ctx.reply(caption + '\n🔗 ' + (file.url || ''), { parse_mode: 'Markdown' });
+            await ctx.telegram.sendDocument(ctx.chat.id, file.file_id, { caption, parse_mode: 'Markdown' });
           }
           await ctx.deleteMessage().catch(() => {});
           return ctx.answerCbQuery('✅ تم إرسال الملف').catch(() => {});
