@@ -861,7 +861,8 @@ async bundleView({bundleId,catId,catName,sbName,smName,yrName,spName}){
 async preview({fileId}){
   loader();
   try{
-    const [f,cmts]=await Promise.all([API.get('/file/'+fileId),API.get('/comments/'+fileId).catch(()=>[])]);
+    const [f,cmtsRes]=await Promise.all([API.get('/file/'+fileId),API.get('/comments/'+fileId).catch(()=>({comments:[]}))]);
+    const cmts=Array.isArray(cmtsRes)?cmtsRes:(cmtsRes?.comments||[]);
     const{i:ico}=ftype(f.file_type);const ur=f.rating?.user||0;
     const hints=['💡 مفيد جداً للمراجعة','📖 اقرأه مع المحاضرة','🎯 من الملفات الأكثر تقييماً','🔥 يحمّله 80% من الطلاب'];
     render(`
