@@ -106,14 +106,19 @@ router.get('/files/:catId', auth, async (req, res) => {
 });
 
 router.get('/file/:id', auth, async (req, res) => {
-  const f = await filesDb.getFile(parseInt(req.params.id));
-  if (!f) return res.status(404).json({ error: 'Not found' });
-  const [rating, fav, comments] = await Promise.all([
-    interactions.getAvgRating(parseInt(req.params.id)),
-    interactions.isFav(parseInt(req.tgUser.id), req.params.id),
-    get('SELECT COUNT(*) as c FROM comments WHERE file_id=$1 AND is_deleted=0', [parseInt(req.params.id)]).then(r => r?.c || 0),
-  ]);
-  res.json({ ...f, rating, fav, comments });
+  try {
+    const f = await filesDb.getFile(parseInt(req.params.id));
+    if (!f) return res.status(404).json({ error: 'Not found' });
+    const [rating, fav, comments] = await Promise.all([
+      interactions.getAvgRating(parseInt(req.params.id)),
+      interactions.isFav(parseInt(req.tgUser.id), req.params.id),
+      get('SELECT COUNT(*) as c FROM comments WHERE file_id=$1 AND is_deleted=0', [parseInt(req.params.id)]).then(r => r?.c || 0),
+    ]);
+    res.json({ ...f, rating, fav, comments });
+  } catch (e) {
+    console.error('[file/:id] fileId=' + req.params.id + ' err=' + e.message, e.stack);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 router.get('/search', auth, async (req, res) => {
