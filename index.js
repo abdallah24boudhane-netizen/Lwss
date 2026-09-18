@@ -108,6 +108,7 @@ const bot = new Telegraf(TOKEN, {
   handlerTimeout: 90000,
   telegram: { apiRoot: process.env.TELEGRAM_API_ROOT || undefined },
 });
+global.__bot = bot; // ✅ يُستخدم من routes/api.js وworkers وhandlers/xp.js للوصول للبوت خارج سياق ctx — كان غير معرَّف إطلاقاً
 
 // ── Rate Limiter ──
 const _floodMap = new Map();
