@@ -7,8 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
 <style>
 :root{
   --bg:#03040a;--bg1:#070912;--bg2:#0c0e1a;--bg3:#111420;--bg4:#161926;
@@ -501,6 +499,21 @@ body.lv5 .spin{border-top-color:#f5c842}
 
 <script>
 'use strict';
+window.addEventListener('error', function(ev){ showFatalError('JS Error', ev.message + ' @ ' + (ev.filename||'').split('/').pop() + ':' + ev.lineno); });
+window.addEventListener('unhandledrejection', function(ev){ showFatalError('Promise Error', (ev.reason && ev.reason.message) || String(ev.reason)); });
+function showFatalError(kind, msg){
+  let box = document.getElementById('__errBox');
+  if(!box){
+    box = document.createElement('div');
+    box.id='__errBox';
+    box.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999999;background:#b00020;color:#fff;padding:10px;font-size:11px;font-family:monospace;white-space:pre-wrap;max-height:50vh;overflow:auto;direction:ltr;text-align:left';
+    document.body.appendChild(box);
+  }
+  const line=document.createElement('div');
+  line.style.cssText='border-top:1px solid rgba(255,255,255,.3);padding-top:6px;margin-top:6px';
+  line.textContent='['+kind+'] '+msg;
+  box.appendChild(line);
+}
 const tg=window.Telegram?.WebApp;
 let ID_DATA='',TG_USER=null,IS_ADMIN=false,IS_OWNER=false;
 let PROFILE=null,POINTS=null,STACK=[],_tab='home',_isBack=false,_srchTimer=null,_srchHist=[];
