@@ -1441,12 +1441,12 @@ async function init(){
       nb.insertAdjacentHTML('beforeend',`<button class="nb" id="nb-admin" onclick="NAV.tab('admin')"><div class="nbbar"></div><span class="nbico">${IS_OWNER?'👑':'🛡️'}</span>${IS_OWNER?'المالك':'إدارة'}</button>`);
     }
     API.post('/points/daily').catch(()=>{});
-    if(pts&&pts.total_points)applyTheme(pts.total_points);
     const pts=await API.get('/points/me').catch(()=>null);
+    if(pts&&pts.total_points)applyTheme(pts.total_points);
     if(pts){POINTS=pts;if(pts.streak_days===7)showAch('🔥','7 أيام متتالية!','شارة جديدة 🎯');if(pts.total_points>=100&&pts.total_points<110)showAch('💎','100 XP!','أحسنت 💪');}
   }catch(e){}
   const ls=document.getElementById('ls'),root=document.getElementById('root');
-  ls.style.opacity='0';root.style.opacity='1';
+  ls.style.opacity='0';ls.style.pointerEvents='none';root.style.opacity='1';
   setTimeout(()=>ls.style.display='none',600);
   NAV.tab('home');
 }
