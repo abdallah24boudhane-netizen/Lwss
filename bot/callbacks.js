@@ -108,7 +108,7 @@ module.exports.registerCallbacks = function(bot, deps) {
     ['mygroups_refresh', ctx => tools.listGroups(ctx)],
     
     ['mg_open_app', async ctx => {
-      const url = process.env.WEBHOOK_URL + '/app/app_index.html';
+      const url = process.env.WEBHOOK_URL + '/app/app_index.html?v=' + Date.now();
       return ctx.reply('📱 افتح الـ Mini App:', {
         reply_markup: { inline_keyboard: [[{ text: '📱 فتح EduMaster App', web_app: { url } }]] }
       }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });

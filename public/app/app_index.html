@@ -499,6 +499,16 @@ body.lv5 .spin{border-top-color:#f5c842}
 
 <script>
 'use strict';
+(function(){
+  var c=document.createElement('div');
+  c.id='__canary';
+  c.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:999999;background:#0a8a3a;color:#fff;padding:6px;font-size:11px;font-family:monospace;text-align:center';
+  c.textContent='JS OK - build v3';
+  document.addEventListener('DOMContentLoaded',function(){document.body.appendChild(c);});
+  if(document.body)document.body.appendChild(c);
+  setInterval(function(){ c.textContent='JS OK - build v3 - '+new Date().toLocaleTimeString(); },1000);
+})();
+document.addEventListener('securitypolicyviolation', function(e){ showFatalError('CSP Blocked', e.violatedDirective+': '+e.blockedURI); });
 window.addEventListener('error', function(ev){ showFatalError('JS Error', ev.message + ' @ ' + (ev.filename||'').split('/').pop() + ':' + ev.lineno); });
 window.addEventListener('unhandledrejection', function(ev){ showFatalError('Promise Error', (ev.reason && ev.reason.message) || String(ev.reason)); });
 function showFatalError(kind, msg){
