@@ -449,6 +449,23 @@ bot.command('clear_cards', async ctx => {
   ctx.reply('✅ تم مسح كل الردود').catch(() => {});
 });
 
+// 🤖 حالة UserBot — Owner فقط
+bot.command('userbot_status', async ctx => {
+  if (String(ctx.from?.id) !== String(process.env.OWNER_ID)) return ctx.reply('🚫').catch(() => {});
+  const { getUserbotStatus } = require('./routes/internal');
+  const s = getUserbotStatus();
+  if (!s.online) {
+    const ago = s.secondsAgo === null ? 'لا يوجد اتصال بعد' : `منذ ${s.secondsAgo} ثانية`;
+    return ctx.reply(`🔴 UserBot Offline\nLast heartbeat: ${ago}`).catch(() => {});
+  }
+  ctx.reply(
+    `🤖 UserBot\n\n` +
+    `Status: 🟢 Online\n` +
+    `Telegram: 🟢 Connected${s.username ? ' (@' + s.username + ')' : ''}\n` +
+    `Last heartbeat: ${s.secondsAgo} seconds ago`
+  ).catch(() => {});
+});
+
 // 🐺 لوب غارو trigger
 bot.hears(/^(لوب غارو|لوب_غارو|ذئب|werewolf)$/i, async (ctx) => {
   if (!['group','supergroup'].includes(ctx.chat?.type)) return;
@@ -687,6 +704,10 @@ async function launch() {
     // ── API Routes ──
     const apiRoutes = require('./routes/api');
     app.use('/api', apiRoutes);
+
+    // ── Internal service-to-service routes (UserBot heartbeat, etc.) ──
+    const internalRoutes = require('./routes/internal');
+    app.use('/internal', internalRoutes.router);
 
     // ── Global Express Error Handler ──
     app.use((err, req, res, _next) => {
