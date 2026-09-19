@@ -618,6 +618,7 @@ async function launch() {
     require('./utils/cache').clearAllSubCache();
     await require('./handlers/group_panel').migrateGroupPanel().catch(() => {});
     await require('./database/db').initBankTables().catch(() => {});
+    await require('./handlers/millionaire').initMillionaireSchema().catch(() => {}); // ✅ كانت معرَّفة وغير مستدعاة أبداً — سبب فشل حفظ نتائج "من سيربح المليون"
     await initPersistentStates();
     logger.info('✅ DB ready');
 
