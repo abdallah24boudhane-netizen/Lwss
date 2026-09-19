@@ -181,6 +181,14 @@ module.exports.registerCallbacks = function(bot, deps) {
       await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_bundle_files', bundleId: bid, fileCount: 0 });
       return ctx.reply('📦 أرسل الملفات الآن.\n/done للإنهاء').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }},
+    { p: 'reply_user_', fn: async (ctx, d) => {
+      // 💬 رد سريع على مستخدم أرسل رسالة/ملف — يفعّل نفس آلية المراسلة الموجودة بـmanage.js (mg_msg_user_content) مباشرة، بدون إدخال ID يدوياً.
+      if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(() => {});
+      const targetId = d.substring(11);
+      await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_msg_user_content', targetId });
+      await ctx.answerCbQuery().catch(() => {});
+      return ctx.reply('📝 اكتب ردّك الآن (نص، صورة، فيديو، sticker، voice):\n_(أو /cancel للإلغاء)_', { parse_mode: 'Markdown' }).catch(() => {});
+    }},
     { p: 'bundle_delete_',    fn: async (ctx, d) => {
       // ✅ RBAC: كانت owner-only — أصبحت مربوطة بصلاحية 'delete' (نفس فئة حذف الملفات، Owner مسموح دائماً).
       if (!(await botRequirePerm(ctx, 'delete'))) return;

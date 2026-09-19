@@ -81,9 +81,11 @@ async function handleForward(ctx) {
     if (msg.caption) caption += `\n\n💬 *التعليق:*\n${msg.caption}`;
   }
 
+  const replyKb = { reply_markup: { inline_keyboard: [[{ text: '💬 رد على ' + senderName, callback_data: 'reply_user_' + sender.id }]] } };
+
   try {
     if (file.type === 'text') {
-      await ctx.telegram.sendMessage(OWNER_ID, caption + `\n\n💬 *النص:*\n${file.text}`, { parse_mode: 'Markdown' });
+      await ctx.telegram.sendMessage(OWNER_ID, caption + `\n\n💬 *النص:*\n${file.text}`, { parse_mode: 'Markdown', ...replyKb });
     } else {
       const sendMap = {
         document:  'sendDocument',
@@ -98,9 +100,9 @@ async function handleForward(ctx) {
       if (!method) return false;
       if (file.type === 'sticker') {
         await ctx.telegram.sendSticker(OWNER_ID, file.file_id);
-        await ctx.telegram.sendMessage(OWNER_ID, caption, { parse_mode: 'Markdown' });
+        await ctx.telegram.sendMessage(OWNER_ID, caption, { parse_mode: 'Markdown', ...replyKb });
       } else {
-        await ctx.telegram[method](OWNER_ID, file.file_id, { caption, parse_mode: 'Markdown' });
+        await ctx.telegram[method](OWNER_ID, file.file_id, { caption, parse_mode: 'Markdown', ...replyKb });
       }
     }
   } catch (e) {
