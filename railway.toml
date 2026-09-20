@@ -1,17 +1,6 @@
 [build]
 builder = "nixpacks"
 
-[build.nixpacksPlan.phases.setup]
-# UserBot (Python/Telethon) يعمل بجانب البوت العادي (Node) بنفس هذه الخدمة عبر pm2.
-nixPkgs = ["nodejs_20", "python3", "python3Packages.pip", "yt-dlp", "ffmpeg", "curl"]
-
-[build.nixpacksPlan.phases.build]
-cmds = [
-  "npm ci --omit=dev",
-  "python3 -m pip install --break-system-packages -r userbot/requirements.txt",
-  "mkdir -p .bin && (curl -fsSL -o .bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp && chmod +x .bin/yt-dlp || echo 'yt-dlp fresh-binary fetch failed, using nix-provided yt-dlp')"
-]
-
 [deploy]
 startCommand = "node_modules/.bin/pm2-runtime ecosystem.config.js"
 restartPolicyType = "on_failure"

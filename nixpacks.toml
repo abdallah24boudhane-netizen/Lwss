@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "yt-dlp", "ffmpeg", "python3", "python3Packages.pip"]
+
+[phases.install]
+cmds = [
+  "npm ci --production",
+  "python3 -m pip install --break-system-packages -r userbot/requirements.txt"
+]
