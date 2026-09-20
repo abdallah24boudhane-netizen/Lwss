@@ -1,9 +1,8 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "yt-dlp", "ffmpeg", "python3"]
+nixPkgs = ["nodejs_20", "yt-dlp", "ffmpeg"]
 
 [phases.install]
-cmds = [
-  "npm ci --production",
-  "python3 -m ensurepip --break-system-packages",
-  "python3 -m pip install --break-system-packages -r userbot/requirements.txt"
-]
+cmds = ["npm ci --production"]
+
+[start]
+cmd = "node index.js"
