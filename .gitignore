@@ -26,6 +26,7 @@ old_data.sql
 data/
 *.log
 *.sh
+!userbot/start.sh
 
 backup.sql
 fix_admin_routes.cjs
