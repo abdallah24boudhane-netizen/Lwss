@@ -494,7 +494,10 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         clearState(uid);
         if(text==='/cancel')return ctx.reply('❌ تم الإلغاء').catch(()=>{});
         const db_ = require('../database/db');
-        const finalText = state.mediaCaption || text || '';
+        let finalText = state.mediaCaption || text || '';
+        if (!finalText) {
+          finalText = await db_.getSetting('start_welcome_text').catch(() => '') || '';
+        }
         await db_.run("INSERT INTO settings(key,value) VALUES('start_welcome_text',$1) ON CONFLICT(key) DO UPDATE SET value=$1",[finalText]).catch(()=>{});
         if (state.mediaFileId) {
           await db_.run("INSERT INTO settings(key,value) VALUES('start_welcome_media_id',$1) ON CONFLICT(key) DO UPDATE SET value=$1",[state.mediaFileId]).catch(()=>{});

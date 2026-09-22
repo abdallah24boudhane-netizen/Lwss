@@ -34,12 +34,12 @@ async function startHandler(ctx) {
     return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(() => {});
   }
 
-  if (welcomeText && !ctx.startPayload) {
+  if ((welcomeText || welcomeMediaId) && !ctx.startPayload) {
     const _now = new Date(Date.now() + 3600000);
     const _date = _now.toLocaleDateString('ar-DZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const _time = _now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const _spec = await require('../database/db').get('SELECT s.name FROM users u LEFT JOIN specialties s ON u.specialty_id=s.id WHERE u.id=$1', [uid]).then(r => r?.name || '').catch(() => '');
-    const _wt = welcomeText
+    const _wt = (welcomeText || '')
       .replace(/\{name\}/g,    ctx.from?.first_name || 'صديق')
       .replace(/\{mention\}/g, '[' + (ctx.from?.first_name || 'صديق') + '](tg://user?id=' + uid + ')')
       .replace(/\{id\}/g,      String(uid))
