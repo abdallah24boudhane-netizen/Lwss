@@ -715,7 +715,12 @@ async function launch() {
       res.status(err.status || 500).json({ error: 'حدث خطأ، حاول مجددًا.' });
     });
 
-    app.listen(PORT, () => logger.info('✅ Express :' + PORT));
+    app.listen(PORT, () => {
+  logger.info('✅ Express :' + PORT);
+  // 🔌 يكتب البورت الحقيقي بملف مشترك عشان UserBot (Python) يقرأه مباشرة
+  // بدل الاعتماد على تخمين localhost:3000 (Railway قد يحقن PORT ديناميكياً).
+  try { require('fs').writeFileSync(require('path').join(__dirname, '.internal_port'), String(PORT)); } catch (_) {}
+});
 
     // FIX: _launched guard — تسجيل handlers مرة واحدة فقط
     if (!_launched) {

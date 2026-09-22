@@ -1,7 +1,10 @@
 """
-الإعدادات — تُقرأ من متغيرات البيئة فقط. لا يوجد أي credential مكتوب بالكود.
+الإعدادات — تُقرأ من متغيرات البيئة، مع كشف تلقائي للبورت الحقيقي لبوت الدراسة
+(Node) عبر ملف مشترك، لأن Railway قد يحقن PORT ديناميكياً بشكل لا يظهر بمتغيرات
+البيئة الثابتة. لا يوجد أي credential مكتوب بالكود.
 """
 import os
+from pathlib import Path
 
 try:
     from dotenv import load_dotenv
@@ -13,11 +16,25 @@ API_ID = os.environ.get("API_ID", "")
 API_HASH = os.environ.get("API_HASH", "")
 PHONE_NUMBER = os.environ.get("PHONE_NUMBER", "")
 SESSION = os.environ.get("SESSION", "userbot_session")
-# ✅ جديد: StringSession — الطريقة الموصى بها لبيئة غير تفاعلية بدون قرص دائم (Railway).
-# إن كانت فارغة، يُستخدم ملف الجلسة المحلي (SESSION أعلاه) كما كان سابقاً — للتشغيل المحلي فقط.
 SESSION_STRING = os.environ.get("SESSION_STRING", "")
 
-LWSS_INTERNAL_URL = os.environ.get("LWSS_INTERNAL_URL", "http://localhost:3000")
+
+def _detect_internal_url():
+    # 1) أولوية لملف .internal_port اللي يكتبه index.js فور نجاح app.listen() —
+    #    مصدر الحقيقة الوحيد الموثوق للبورت الفعلي.
+    try:
+        port_file = Path(__file__).resolve().parent.parent / ".internal_port"
+        if port_file.exists():
+            port = port_file.read_text().strip()
+            if port.isdigit():
+                return f"http://localhost:{port}"
+    except Exception:
+        pass
+    # 2) احتياطي: متغيّر البيئة كما كان سابقاً.
+    return os.environ.get("LWSS_INTERNAL_URL", "http://localhost:3000")
+
+
+LWSS_INTERNAL_URL = _detect_internal_url()
 USERBOT_INTERNAL_SECRET = os.environ.get("USERBOT_INTERNAL_SECRET", "")
 
 HEARTBEAT_INTERVAL_SECONDS = int(os.environ.get("HEARTBEAT_INTERVAL_SECONDS", "30"))
