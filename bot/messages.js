@@ -48,6 +48,10 @@ module.exports.registerMessages = function(bot, deps) {
         await manage.handleText(ctx, _acState);
         return;
       }
+      if (_acState?.type === 'mg_set_welcome' && (ctx.isAdmin || ctx.isOwner)) {
+        await manage.handleText(ctx, _acState);
+        return;
+      }
     }
 
     if (ctx.chat?.type === 'private' && ctx.from?.id === OWNER_ID && ctx.message?.text?.startsWith('!'))
